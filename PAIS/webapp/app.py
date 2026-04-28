@@ -282,11 +282,90 @@ def upload():
             out_path = Path(app.config["UPLOAD_FOLDER"]) / f"scored_{fname}"
             new_df.to_csv(out_path, index=False)
 
+            # ----------------------------------------------------------------
+            # Full analysis on the uploaded cohort.
+            # Same shape as the main dashboard so the page feels native.
+            # ----------------------------------------------------------------
+
+            # Band distribution — keep the band order consistent with the main
+            # dashboard so the chart colour ramp lines up.
+            band_order = ["SAFE", "LOW", "MODERATE", "HIGH", "CRITICAL"]
+            band_counts = {b: int((new_df["risk_band"] == b).sum())
+                           for b in band_order}
+
+            # Mean risk per department (Department is already validated above)
+            dept_avg = (new_df.groupby("Department")["risk_score"]
+                        .mean().round(3).to_dict())
+            dept_count = (new_df.groupby("Department").size().to_dict())
+
+            # Top-10 at-risk via the actual heap module — same code path the
+            # main dashboard uses, gives the panel feature parity.
+            heap = RiskHeap()
+            for _, row in new_df.iterrows():
+                full_name = (
+                    f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
+                    or row["Student_ID"]
+                )
+                heap.push(row["Student_ID"], float(row["risk_score"]),
+                          {"name": full_name, "department": row["Department"],
+                           "band": row["risk_band"]})
+            top10 = heap.peek_top(10)
+
+            # Sliding-window anomaly detection.
+            # The uploaded CSV has only aggregate attendance %, no daily rows,
+            # so we synthesise a daily log from each student's attendance %
+            # using the same generator the original cohort uses. We're upfront
+            # that this is synthetic (also flagged on the model page).
+            try:
+                upload_logs = generate_daily_logs(new_df)
+                anomalies_df = detect_attendance_anomalies(upload_logs)
+                anomaly_count = int(len(anomalies_df))
+                worst_windows = anomalies_df.head(5).to_dict(orient="records")
+            except Exception as exc:  # never block the page on this
+                print(f"sliding-window failed: {exc}")
+                anomaly_count = 0
+                worst_windows = []
+
+            # Improvers / decliners via the stable-sort module.
+            try:
+                ranked = rank_by_gradient(new_df)
+                # Pull a name lookup so panel can show "S0042  Sara Khan"
+                names = {row["Student_ID"]: (
+                    f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
+                    or row["Student_ID"])
+                         for _, row in new_df.iterrows()}
+                def _format(rows):
+                    out = []
+                    for _, r in rows.iterrows():
+                        sid = r["Student_ID"]
+                        out.append({
+                            "sid": sid,
+                            "name": names.get(sid, sid),
+                            "early": round(float(r["early_academic_avg"]), 1),
+                            "midterm": round(float(r["Midterm_Score"]), 1),
+                            "delta": round(float(r["gradient"]), 1),
+                        })
+                    return out
+                improvers = _format(ranked.head(5))
+                decliners = _format(ranked.tail(5).iloc[::-1])
+            except Exception as exc:
+                print(f"sorter failed: {exc}")
+                improvers, decliners = [], []
+
             return render_template(
                 "upload.html",
                 results=new_df.head(100).to_dict(orient="records"),
                 n_scored=len(new_df),
                 n_at_risk=int((new_df["risk_band"].isin(["CRITICAL", "HIGH"])).sum()),
+                avg_risk=round(float(new_df["risk_score"].mean()), 3),
+                anomaly_count=anomaly_count,
+                bands=band_counts,
+                dept_avg=dept_avg,
+                dept_count=dept_count,
+                top10=top10,
+                worst_windows=worst_windows,
+                improvers=improvers,
+                decliners=decliners,
                 download_file=out_path.name,
             )
         except Exception as e:
@@ -714,3 +793,4 @@ if __name__ == "__main__":
     print(f"Ready. Open http://{host}:{port}")
     # debug=True only locally; Render sets PORT so this branch is safe.
     app.run(host=host, port=port, debug=(os.environ.get("FLASK_ENV") != "production"))
+

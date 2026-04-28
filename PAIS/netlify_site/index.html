@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">Command Centre</div>
+        <h1 class="page-title">Intervention Overview</h1>
+        <p class="page-subtitle">
+          Real-time cohort risk view — scored by a <span class="mono" id="winnerName">—</span>
+          model with F1 = <span class="mono" id="winnerF1">—</span> · AUC =
+          <span class="mono" id="winnerAUC">—</span>.
+        </p>
+      </div>
+      <div><a href="upload.html" class="btn btn-primary">Score new cohort →</a></div>
+    </header>
+
+    <section class="kpi-row" id="kpiRow">
+      <div class="panel empty-state">Loading…</div>
+    </section>
+
+    <section class="grid-2" style="margin-bottom: 22px;">
+      <div class="panel">
+        <div class="panel-head"><div>
+          <div class="panel-title">Risk band distribution</div>
+          <div class="panel-sub">Where the cohort sits on the risk spectrum</div>
+        </div></div>
+        <div class="chart-wrap"><canvas id="bandChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Top-10 at-risk</div>
+            <div class="panel-sub">Ranked by risk score — max-heap in Flask; sorted here for parity</div>
+          </div>
+          <a href="students.html" class="small">View all →</a>
+        </div>
+        <table class="datatable datatable-compact">
+          <thead><tr><th>#</th><th>Student</th><th>Band</th><th>Score</th></tr></thead>
+          <tbody id="top10Body"><tr><td colspan="4" class="empty-state">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><div>
+          <div class="panel-title">Risk by department</div>
+          <div class="panel-sub">Mean blended risk score</div>
+        </div></div>
+        <div class="chart-wrap"><canvas id="deptChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div>
+          <div class="panel-title">System snapshot</div>
+          <div class="panel-sub">DSA subsystems · pre-computed at build time</div>
+        </div></div>
+        <table class="datatable datatable-compact" id="snapshotBody"></table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script>
+(async function() {
+  const stats = await DATA.stats();
+  const students = applyEditsToSummaries(await DATA.students());
+
+  document.getElementById('winnerName').textContent = stats.winner || '—';
+  document.getElementById('winnerF1').textContent = stats.test_metrics?.f1 ?? '—';
+  document.getElementById('winnerAUC').textContent = stats.test_metrics?.roc_auc ?? '—';
+
+  // Recompute aggregates client-side so local edits reflect immediately
+  const bands = {CRITICAL: 0, HIGH: 0, MODERATE: 0, LOW: 0, SAFE: 0};
+  const deptCt = {}, deptRisk = {};
+  let sumRisk = 0;
+  for (const r of students) {
+    if (bands[r.risk_band] != null) bands[r.risk_band]++;
+    deptCt[r.department] = (deptCt[r.department] || 0) + 1;
+    (deptRisk[r.department] = deptRisk[r.department] || []).push(r.risk_score);
+    sumRisk += r.risk_score;
+  }
+  const deptAvg = Object.fromEntries(
+    Object.entries(deptRisk).map(([d, a]) => [d, a.reduce((x,y)=>x+y,0)/a.length])
+  );
+  const critHigh = bands.CRITICAL + bands.HIGH;
+  const avgRisk = students.length ? sumRisk / students.length : 0;
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi">
+      <div class="kpi-label">Students Monitored</div>
+      <div class="kpi-value">${students.length.toLocaleString()}</div>
+      <div class="kpi-foot">Across ${Object.keys(deptCt).length} departments</div>
+    </div>
+    <div class="kpi kpi-critical">
+      <div class="kpi-label">Critical + High</div>
+      <div class="kpi-value">${critHigh}</div>
+      <div class="kpi-foot">${(critHigh / students.length * 100).toFixed(1)}% · immediate action</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Attendance Anomalies</div>
+      <div class="kpi-value">${stats.anomaly_count ?? '—'}</div>
+      <div class="kpi-foot">Sliding 7-day windows flagged</div>
+    </div>
+    <div class="kpi kpi-accent">
+      <div class="kpi-label">Avg Risk Score</div>
+      <div class="kpi-value">${avgRisk.toFixed(2)}</div>
+      <div class="kpi-foot">0.00 (safe) → 1.00 (critical)</div>
+    </div>
+  `;
+
+  const top10 = [...students].sort((a,b) => b.risk_score - a.risk_score).slice(0, 10);
+  document.getElementById('top10Body').innerHTML = top10.map((r, i) => `
+    <tr>
+      <td class="mono muted">${i + 1}</td>
+      <td><a href="student.html?id=${r.student_id}">${r.name}</a>
+        <div class="mono muted small">${r.student_id} · ${r.department}</div></td>
+      <td>${bandBadge(r.risk_band)}</td>
+      <td class="mono">${fmtScore(r.risk_score)}</td>
+    </tr>
+  `).join('');
+
+  const g = stats.graph_summary || {};
+  document.getElementById('snapshotBody').innerHTML = `
+    <tbody>
+      <tr><td class="muted">Student-resource graph</td><td class="mono">${g.num_students ?? '—'} ↔ ${g.num_resources ?? '—'}</td></tr>
+      <tr><td class="muted">Graph edges</td><td class="mono">${(g.num_edges ?? 0).toLocaleString()}</td></tr>
+      <tr><td class="muted">Isolated students (BFS)</td><td class="mono">${g.isolated_count ?? '—'}</td></tr>
+      <tr><td class="muted">Attendance anomalies</td><td class="mono">${stats.anomaly_count ?? '—'}</td></tr>
+      <tr><td class="muted">Best model</td><td class="mono">${stats.winner ?? '—'}</td></tr>
+      <tr><td class="muted">Test F1 · AUC</td><td class="mono">${stats.test_metrics?.f1 ?? '—'} · ${stats.test_metrics?.roc_auc ?? '—'}</td></tr>
+    </tbody>
+  `;
+
+  new Chart(document.getElementById('bandChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(bands),
+      datasets: [{
+        data: Object.values(bands),
+        backgroundColor: Object.keys(bands).map(b => RISK_COLORS[b]),
+        borderRadius: 4, barThickness: 44,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: '#efebe0' }, ticks: { precision: 0 } },
+        x: { grid: { display: false } },
+      },
+    },
+  });
+
+  const labels = Object.keys(deptAvg);
+  new Chart(document.getElementById('deptChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: labels.map(l => deptAvg[l]),
+        backgroundColor: '#1e3a5f',
+        borderRadius: 4, barThickness: 40,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { afterBody: c => `n = ${deptCt[c[0].label]}` } },
+      },
+      scales: {
+        x: { min: 0, max: 1, grid: { color: '#efebe0' } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+})();
+</script>
+</body>
+</html>

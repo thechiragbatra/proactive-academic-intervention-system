@@ -1,0 +1,48 @@
+# Render.com deploy blueprint for PAIS.
+#
+# Push this repo to GitHub, then on Render click "New → Blueprint" and point it
+# at the repo. Render reads this file and provisions everything automatically.
+#
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: pais
+    runtime: python
+    plan: free                         # free tier (spins down after 15 min idle)
+    region: singapore                  # closest to India; change if you prefer
+    branch: main                       # which git branch to deploy
+    autoDeploy: true                   # redeploy on every push
+
+    # One-time setup: install deps, run the full pipeline so the model,
+    # figures, and daily-engagement logs exist inside the container.
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python main.py --skip-train || python main.py
+
+    # Production server.
+    #   --workers 1      : single worker keeps the in-memory heap, cohort, and
+    #                      edits-overlay consistent (multi-worker would see
+    #                      divergent state per worker).
+    #   --threads 4      : handles concurrent requests within the one worker.
+    #   --timeout 120    : first request pays the pipeline-warmup cost (~15 s);
+    #                      generous timeout prevents spurious kills.
+    #   (no --preload)   : port binds immediately so Render's health check
+    #                      passes before warmup finishes.
+    startCommand: >
+      gunicorn wsgi:app
+      --workers 1
+      --threads 4
+      --timeout 120
+      --bind 0.0.0.0:$PORT
+      --access-logfile -
+      --error-logfile -
+
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: PYTHONUNBUFFERED
+        value: "1"

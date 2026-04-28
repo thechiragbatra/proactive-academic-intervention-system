@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% block title %}Algorithm Walkthrough — {{ app_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Page-scoped styles for the walkthrough cards.
+       Six near-identical cards stacked vertically. Each one a
+       self-contained "what / how / running it" trio. */
+    .walk-intro {
+      max-width: 720px;
+      color: var(--ink-muted);
+      font-size: 14px;
+      line-height: 1.55;
+      margin-bottom: 28px;
+    }
+
+    .algo-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      margin-bottom: 22px;
+      overflow: hidden;
+    }
+
+    .algo-card-head {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .algo-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-muted);
+      letter-spacing: 0.08em;
+    }
+    .algo-name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1.2;
+      color: var(--ink);
+      margin: 0;
+    }
+    .algo-complexity {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 4px 9px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+    }
+
+    .algo-body {
+      padding: 18px 22px 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 980px) {
+      .algo-body { grid-template-columns: 1fr; }
+    }
+
+    .algo-section h4 {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin: 0 0 8px;
+    }
+    .algo-section p {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--ink);
+      margin: 0 0 10px;
+    }
+    .algo-section p:last-child { margin-bottom: 0; }
+
+    /* Code block — kept short, dark scheme to read like a real terminal */
+    .algo-code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.55;
+      background: #1f2328;
+      color: #e6e1d5;
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .algo-code .kw   { color: #c8a2d6; }
+    .algo-code .fn   { color: #a8d4ff; }
+    .algo-code .str  { color: #b6d39c; }
+    .algo-code .num  { color: #f0b88a; }
+    .algo-code .com  { color: #6f7378; font-style: italic; }
+    .algo-code .self { color: #f0a3a3; }
+
+    /* Sample I/O — light theme, readable next to the dark code */
+    .algo-output {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      background: var(--bg-subtle);
+      color: var(--ink);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .algo-output .lbl { color: var(--ink-muted); }
+    .algo-output .ok  { color: var(--risk-safe); font-weight: 500; }
+    .algo-output .bad { color: var(--risk-critical); font-weight: 500; }
+    .algo-output .acc { color: var(--accent); font-weight: 500; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">DSA Engine</div>
+    <h1 class="page-title">Algorithm Walkthrough</h1>
+    <p class="page-subtitle walk-intro">
+      Six classical algorithms, each running on the actual cohort of 5,000
+      students. For every algorithm: a short description, the core code, and
+      the real output we see when we run it. No animations, just the concept.
+    </p>
+  </div>
+</header>
+
+<!-- 01 PRIORITY QUEUE -->
+<section class="algo-card">
+  <header class="algo-card-head">
+    <span class="algo-num">01</span>
+    <h2 class="algo-name">Priority Queue · max-heap</h2>
+    <span class="algo-complexity">push: O(log n) · top: O(1)</span>
+  </header>
+  <div class="algo-body">
+    <div class="algo-section">
+      <h4>Concept</h4>
+      <p>A max-heap keeps the highest-risk student at the root. The mentor's dashboard needs the top 10 worst cases, and updates happen often (edits, what-if simulations). Re-sorting 5,000 entries every change is O(n log n); a heap update is O(log n) and reading the top is O(1).</p>
+      <p>Python's <code>heapq</code> is a min-heap, so we store <code>-score</code> to flip it. A monotonic counter breaks ties.</p>
+    </div>
+    <div class="algo-section">
+      <h4>Core code</h4>
+      <pre class="algo-code"><span class="kw">import</span> heapq
+
+<span class="kw">class</span> <span class="fn">RiskHeap</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="self">self</span>):
+        <span class="self">self</span>._heap = []
+        <span class="self">self</span>._counter = <span class="num">0</span>
+
+    <span class="kw">def</span> <span class="fn">push</span>(<span class="self">self</span>, sid, score, meta):
+        <span class="com"># negate score → max-heap behaviour</span>
+        heapq.heappush(<span class="self">self</span>._heap,
+                       (-score, <span class="self">self</span>._counter, sid, meta))
+        <span class="self">self</span>._counter += <span class="num">1</span>
+
+    <span class="kw">def</span> <span class="fn">peek_top</span>(<span class="self">self</span>, k=<span class="num">1</span>):
+        <span class="kw">return</span> heapq.nsmallest(k, <span class="self">self</span>._heap)</pre>
+    </div>
+  </div>
+  <div class="algo-body" style="padding-top:0; grid-template-columns: 1fr;">
+    <div class="algo-section">
+      <h4>Running it on the cohort</h4>
+      <pre class="algo-output"><span class="lbl">heap = RiskHeap()
+for r in cohort:                      # 5,000 students
+    heap.push(r.student_id, r.risk_score, meta)
+
+len(heap)              </span><span class="acc">→ 5000</span>
+<span class="lbl">heap.peek_top(5)       →</span>
+  1. S1592  Ahmed Jones        Mathematics    <span class="bad">HIGH</span>   risk=0.776
+  2. S4380  Ahmed Smith        Engineering    <span class="bad">HIGH</span>   risk=0.776
+  3. S5391  Emma Jones         CS             <span class="bad">HIGH</span>   risk=0.761
+  4. S5814  Maria Brown        Business       <span class="bad">HIGH</span>   risk=0.760
+  5. S2083  Maria Brown        Business       <span class="bad">HIGH</span>   risk=0.758</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 02 SLIDING WINDOW -->
+<section class="algo-card">
+  <header class="algo-card-head">
+    <span class="algo-num">02</span>
+    <h2 class="algo-name">Sliding Window · attendance anomaly</h2>
+    <span class="algo-complexity">O(d) per student · d = days</span>
+  </header>
+  <div class="algo-body">
+    <div class="algo-section">
+      <h4>Concept</h4>
+      <p>Aggregate attendance hides short collapses. A student at 85% overall can have a one-week blackout that signals trouble. We slide a 7-day window across each student's daily log and flag windows where the mean drops below 50% or variance is too high.</p>
+      <p>Trick: keep a running sum. Adding the new day and subtracting the leaving day is O(1) per step, so the whole scan is O(d) instead of O(d × window).</p>
+    </div>
+    <div class="algo-section">
+      <h4>Core code</h4>
+      <pre class="algo-code"><span class="kw">def</span> <span class="fn">scan</span>(days, attended, w=<span class="num">7</span>):
+    <span class="com"># running sum trick — O(d) total</span>
+    s = <span class="fn">sum</span>(attended[:w])
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(attended) - w + <span class="num">1</span>):
+        mean = s / w
+        <span class="kw">if</span> mean &lt; <span class="num">0.5</span>:
+            <span class="kw">yield</span> (i, i + w - <span class="num">1</span>, mean)
+        <span class="kw">if</span> i + w &lt; <span class="fn">len</span>(attended):
+            s += attended[i + w]      <span class="com"># enters</span>
+            s -= attended[i]          <span class="com"># leaves</span></pre>
+    </div>
+  </div>
+  <div class="algo-body" style="padding-top:0; grid-template-columns: 1fr;">
+    <div class="algo-section">
+      <h4>Running it on the cohort</h4>
+      <pre class="algo-output"><span class="lbl">logs.shape             </span><span class="acc">→ (420000, 4)   # 5000 students × 84 days</span>
+<span class="lbl">anomalies = detect_attendance_anomalies(logs)
+len(anomalies)         </span><span class="acc">→ 4890          # worst window per student</span>
+
+<span class="lbl">First 3:</span>
+  S3507  days [76..82]  mean=<span class="bad">0.00</span>  attendance dropped below 50%
+  S3734  days [25..31]  mean=<span class="bad">0.00</span>  attendance dropped below 50%
+  S2999  days [70..76]  mean=<span class="bad">0.00</span>  attendance dropped below 50%</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 03 HASH MAP -->
+<section class="algo-card">
+  <header class="algo-card-head">
+    <span class="algo-num">03</span>
+    <h2 class="algo-name">Hash Map · O(1) student lookup</h2>
+    <span class="algo-complexity">avg O(1) per get/put</span>
+  </header>
+  <div class="algo-body">
+    <div class="algo-section">
+      <h4>Concept</h4>
+      <p>Each click on a student profile builds a view by joining academic data, daily logs, risk score, and recommendations. With a DataFrame scan that's O(n) per click. A hash map (Python's <code>dict</code> under the hood) gives us O(1) average lookup.</p>
+      <p>We wrap the dict in a thin class so call sites stay clean and the storage can swap out (Redis, sqlite) without touching them.</p>
+    </div>
+    <div class="algo-section">
+      <h4>Core code</h4>
+      <pre class="algo-code"><span class="kw">class</span> <span class="fn">StudentHashIndex</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="self">self</span>):
+        <span class="self">self</span>._table = {}    <span class="com"># Python dict</span>
+
+    <span class="kw">def</span> <span class="fn">put</span>(<span class="self">self</span>, sid, profile):
+        <span class="self">self</span>._table[sid] = profile
+
+    <span class="kw">def</span> <span class="fn">get</span>(<span class="self">self</span>, sid):
+        <span class="kw">return</span> <span class="self">self</span>._table.<span class="fn">get</span>(sid)
+
+    <span class="kw">def</span> <span class="fn">__len__</span>(<span class="self">self</span>):
+        <span class="kw">return</span> <span class="fn">len</span>(<span class="self">self</span>._table)</pre>
+    </div>
+  </div>
+  <div class="algo-body" style="padding-top:0; grid-template-columns: 1fr;">
+    <div class="algo-section">
+      <h4>Running it on the cohort</h4>
+      <pre class="algo-output"><span class="lbl">idx = StudentHashIndex()
+for r in cohort: idx.put(r.student_id, r.profile)
+len(idx)               </span><span class="acc">→ 5000</span>
+
+<span class="lbl">idx.get('S1042')       →</span> {'name': 'Liam Smith',  'dept': 'CS',          'risk': 0.412}
+<span class="lbl">idx.get('S2017')       →</span> {'name': 'Aisha Brown', 'dept': 'Engineering', 'risk': 0.183}
+<span class="lbl">idx.get('S3000')       →</span> {'name': 'Omar Davis',  'dept': 'Mathematics', 'risk': 0.625}
+<span class="lbl">idx.get('S9999')       →</span> <span class="bad">None</span>      <span class="lbl"># key not found</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 04 GRAPH + BFS -->
+<section class="algo-card">
+  <header class="algo-card-head">
+    <span class="algo-num">04</span>
+    <h2 class="algo-name">Bipartite Graph · BFS for engagement</h2>
+    <span class="algo-complexity">BFS: O(V + E)</span>
+  </header>
+  <div class="algo-body">
+    <div class="algo-section">
+      <h4>Concept</h4>
+      <p>Engagement isn't one-dimensional. A student might attend classes but never touch course materials. We model the access pattern as a bipartite graph — students on one side, course resources on the other, edges weighted by access count.</p>
+      <p>A BFS from the core resources gives us the set of "reachable" students. Anyone with fewer than 2 distinct resource ties is flagged as isolated.</p>
+    </div>
+    <div class="algo-section">
+      <h4>Core code</h4>
+      <pre class="algo-code"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict, deque
+
+<span class="kw">class</span> <span class="fn">ResourceGraph</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="self">self</span>):
+        <span class="self">self</span>.adj = defaultdict(<span class="fn">dict</span>)
+
+    <span class="kw">def</span> <span class="fn">add_edge</span>(<span class="self">self</span>, sid, res, w=<span class="num">1</span>):
+        <span class="self">self</span>.adj[<span class="str">f"S:{sid}"</span>][<span class="str">f"R:{res}"</span>] = w
+        <span class="self">self</span>.adj[<span class="str">f"R:{res}"</span>][<span class="str">f"S:{sid}"</span>] = w
+
+    <span class="kw">def</span> <span class="fn">bfs</span>(<span class="self">self</span>, start):
+        seen, q = {start}, deque([start])
+        <span class="kw">while</span> q:
+            n = q.popleft()
+            <span class="kw">for</span> nb <span class="kw">in</span> <span class="self">self</span>.adj[n]:
+                <span class="kw">if</span> nb <span class="kw">not in</span> seen:
+                    seen.<span class="fn">add</span>(nb); q.<span class="fn">append</span>(nb)
+        <span class="kw">return</span> seen</pre>
+    </div>
+  </div>
+  <div class="algo-body" style="padding-top:0; grid-template-columns: 1fr;">
+    <div class="algo-section">
+      <h4>Running it on the cohort</h4>
+      <pre class="algo-output"><span class="lbl">g = ResourceGraph().build_from_logs(logs)
+g.summary()            →</span>
+  nodes:     <span class="acc">5012</span>      <span class="lbl"># 5000 students + 12 resources</span>
+  edges:     <span class="acc">59987</span>     <span class="lbl"># student ↔ resource access pairs</span>
+  resources: <span class="acc">12</span>        <span class="lbl"># lecture, slides, lab, ...</span>
+
+<span class="lbl">g.isolated_students(threshold=2)   </span><span class="acc">→ 0</span>
+<span class="lbl"># every student has at least 2 resource ties in this dataset</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 05 GREEDY -->
+<section class="algo-card">
+  <header class="algo-card-head">
+    <span class="algo-num">05</span>
+    <h2 class="algo-name">Greedy · grade roadmap</h2>
+    <span class="algo-complexity">O(g) · g = grade tiers</span>
+  </header>
+  <div class="algo-body">
+    <div class="algo-section">
+      <h4>Concept</h4>
+      <p>Telling a student "you are at risk" is useless. Telling them "you need 67% on the final to scrape an A" is actionable. For each grade target, we compute the minimum percentage on the remaining evaluations.</p>
+      <p>It's greedy because we walk grade targets from highest cutoff downwards and commit to a uniform required percentage at each step — no backtracking. Targets where the percentage exceeds 100 are marked infeasible.</p>
+    </div>
+    <div class="algo-section">
+      <h4>Core code</h4>
+      <pre class="algo-code"><span class="kw">def</span> <span class="fn">recommend_for_grade</span>(target, cutoff, earned,
+                        remaining_weight):
+    gap = cutoff - earned
+    <span class="kw">if</span> gap &lt;= <span class="num">0</span>:
+        <span class="kw">return</span> {<span class="str">"feasible"</span>: <span class="kw">True</span>,
+                <span class="str">"required_pct"</span>: <span class="num">0</span>,
+                <span class="str">"note"</span>: <span class="str">"already locked"</span>}
+
+    pct = gap / remaining_weight
+    <span class="kw">return</span> {<span class="str">"feasible"</span>: pct &lt;= <span class="num">100</span>,
+            <span class="str">"required_pct"</span>: pct,
+            <span class="str">"note"</span>: <span class="fn">build_note</span>(pct)}</pre>
+    </div>
+  </div>
+  <div class="algo-body" style="padding-top:0; grid-template-columns: 1fr;">
+    <div class="algo-section">
+      <h4>Running it on the cohort</h4>
+      <pre class="algo-output"><span class="lbl">student = cohort['S1000']        # Omar Williams
+midterm:     </span>40.6  <span class="lbl">  assignments:  73.7
+quizzes:     </span>53.2  <span class="lbl">  projects:     62.8
+already earned (weighted):       </span>10.95<span class="lbl">
+
+opt.full_roadmap(...)</span>
+  <span class="ok">✓</span>  Grade O   (cutoff 90)   needs <span class="acc">79.0%</span> on remaining
+  <span class="ok">✓</span>  Grade A+  (cutoff 80)   needs <span class="acc">69.0%</span> on remaining
+  <span class="ok">✓</span>  Grade A   (cutoff 70)   needs <span class="acc">59.0%</span> on remaining
+  <span class="ok">✓</span>  Grade B+  (cutoff 60)   needs <span class="acc">49.0%</span> on remaining
+  <span class="ok">✓</span>  Grade B   (cutoff 50)   needs <span class="acc">39.0%</span> on remaining</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 06 STABLE SORT -->
+<section class="algo-card">
+  <header class="algo-card-head">
+    <span class="algo-num">06</span>
+    <h2 class="algo-name">Stable Sort · improvement gradient</h2>
+    <span class="algo-complexity">O(n log n) · mergesort</span>
+  </header>
+  <div class="algo-body">
+    <div class="algo-section">
+      <h4>Concept</h4>
+      <p>The Analytics page surfaces top improvers (students whose midterm jumped vs their pre-midterm average) and fastest decliners. The gradient is <code>midterm − early_avg</code>. Positive means improving, negative means declining.</p>
+      <p>We pass <code>kind="mergesort"</code> explicitly because mergesort is guaranteed stable. Two students with identical gradients keep their original order across runs.</p>
+    </div>
+    <div class="algo-section">
+      <h4>Core code</h4>
+      <pre class="algo-code"><span class="kw">def</span> <span class="fn">rank_by_gradient</span>(df):
+    df = df.<span class="fn">copy</span>()
+    df[<span class="str">"gradient"</span>] = (
+        df[<span class="str">"Midterm_Score"</span>]
+        - df[<span class="str">"early_academic_avg"</span>]
+    )
+    <span class="com"># mergesort → guaranteed stable</span>
+    <span class="kw">return</span> df.<span class="fn">sort_values</span>(
+        <span class="str">"gradient"</span>,
+        ascending=<span class="kw">False</span>,
+        kind=<span class="str">"mergesort"</span>,
+    )</pre>
+    </div>
+  </div>
+  <div class="algo-body" style="padding-top:0; grid-template-columns: 1fr;">
+    <div class="algo-section">
+      <h4>Running it on the cohort</h4>
+      <pre class="algo-output"><span class="lbl">ranked = rank_by_gradient(df)        # 5000 rows, mergesort</span>
+
+<span class="lbl">Top 5 improvers:</span>
+  S3004   early=70.98   midterm=99.08   delta=<span class="ok">+28.10</span>
+  S5635   early=72.10   midterm=99.81   delta=<span class="ok">+27.71</span>
+  S4674   early=71.50   midterm=98.58   delta=<span class="ok">+27.08</span>
+  S1537   early=72.92   midterm=99.82   delta=<span class="ok">+26.90</span>
+  S3921   early=72.76   midterm=99.04   delta=<span class="ok">+26.28</span>
+
+<span class="lbl">Bottom 5 (decliners):</span>
+  S5042   early=74.23   midterm=40.43   delta=<span class="bad">-33.80</span>
+  S3267   early=75.05   midterm=42.05   delta=<span class="bad">-33.00</span>
+  S5780   early=75.46   midterm=43.96   delta=<span class="bad">-31.50</span>
+  S4931   early=75.62   midterm=44.84   delta=<span class="bad">-30.78</span>
+  S3407   early=71.49   midterm=40.83   delta=<span class="bad">-30.66</span></pre>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}{% endblock %}

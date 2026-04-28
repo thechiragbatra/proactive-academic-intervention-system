@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">Alert Log</div>
+        <h1 class="page-title">Notifications</h1>
+        <p class="page-subtitle">
+          Every alert you've dispatched on this device. In the static deployment,
+          there's no server to actually send email — notifications are logged to
+          browser localStorage instead and survive across sessions.
+        </p>
+      </div>
+      <div><button class="btn" id="clearBtn">Clear log</button></div>
+    </header>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script>
+(function() {
+  const items = (readStore(STORE_NOTIFS).log) || [];
+  const content = document.getElementById('content');
+
+  if (!items.length) {
+    content.innerHTML = `
+      <div class="panel"><div class="empty-state">
+        <div style="font-family: var(--font-display); font-size: 20px; margin-bottom: 8px;">No notifications yet</div>
+        <div class="muted">Open a student profile and click <strong>Notify</strong> to dispatch an alert.</div>
+      </div></div>`;
+  } else {
+    content.innerHTML = `
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Most recent · newest first</div>
+          <div class="panel-sub">Showing last ${Math.min(items.length, 200)} entries</div></div>
+          <span class="small muted">${items.length} entries</span>
+        </div>
+        <table class="datatable">
+          <thead><tr><th>When</th><th>Recipient</th><th>Student</th><th>Band</th><th>Subject</th></tr></thead>
+          <tbody>
+            ${items.slice(0, 200).map(n => `
+              <tr>
+                <td class="mono muted small">${(n.created_at || '').slice(0, 19)}</td>
+                <td><span class="badge ${n.recipient === 'parent' ? 'badge-HIGH' : 'badge-LOW'}">${n.recipient}</span>
+                    <div class="small muted mono">${n.to_email}</div></td>
+                <td><a href="student.html?id=${n.student_id}" class="mono">${n.student_id}</a></td>
+                <td>${bandBadge(n.risk_band)}</td>
+                <td>${n.subject}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById('clearBtn').onclick = () => {
+    if (confirm('Clear all notifications from browser storage?')) {
+      writeStore(STORE_NOTIFS, { log: [] });
+      location.reload();
+    }
+  };
+})();
+</script>
+</body>
+</html>

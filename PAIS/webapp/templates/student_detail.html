@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}{{ r.full_name }} — {{ app_name }}{% endblock %}
+{% block content %}
+
+<div style="margin-bottom: 14px;">
+  <a href="{{ url_for('students_list') }}" class="small muted">← All students</a>
+</div>
+
+<div class="hero">
+  <div>
+    <h1 class="hero-name">{{ r.full_name }}</h1>
+    <div class="hero-id">{{ r.student_id }} · {{ r.email }}</div>
+    <div class="hero-meta">
+      <span>🎓 {{ r.department }}</span>
+      <span>👤 {{ r.gender }}, {{ r.age }}</span>
+      <span>💼 {{ r.family_income or '—' }} income</span>
+      <span>🏠 Internet: {{ r.internet_access or '—' }}</span>
+    </div>
+  </div>
+  <div class="risk-dial">
+    <div class="risk-dial-value" style="color: var(--risk-{{ r.risk_band|lower }});">
+      {{ "%.2f"|format(r.risk_score or 0) }}
+    </div>
+    <div class="risk-dial-label">
+      <span class="badge badge-{{ r.risk_band }}">{{ r.risk_band }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="stack">
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Academic vitals</div>
+          <div class="panel-sub">Values available 4-6 weeks before finals</div>
+        </div>
+      </div>
+      <div class="vitals">
+        {% set vitals = [
+          ('Attendance',    r.attendance,     100, '%'),
+          ('Midterm',       r.midterm,        100, ''),
+          ('Assignments',   r.assignments_avg,100, ''),
+          ('Quizzes',       r.quizzes_avg,    100, ''),
+          ('Participation', r.participation,  100, ''),
+          ('Projects',      r.projects,       100, ''),
+        ] %}
+        {% for label, val, max_val, unit in vitals %}
+          {% set pct = (val or 0) / max_val * 100 %}
+          {% set cls = 'danger' if pct < 50 else 'warn' if pct < 65 else 'good' if pct >= 80 else '' %}
+          <div class="vital">
+            <div class="vital-label">{{ label }}</div>
+            <div class="vital-bar-track">
+              <div class="vital-bar-fill {{ cls }}" style="width: {{ pct }}%;"></div>
+            </div>
+            <div class="vital-value">{{ "%.1f"|format(val or 0) }}{{ unit }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if daily_logs %}
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Daily engagement</div>
+          <div class="panel-sub">84-day attendance + resource access · sliding-window backing data</div>
+        </div>
+        {% if anomaly %}
+          <span class="badge badge-HIGH">Window flagged: {{ anomaly.reason }}</span>
+        {% endif %}
+      </div>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="dailyChart"></canvas></div>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Grade recovery roadmap</div>
+          <div class="panel-sub">Greedy optimizer · min % per remaining evaluation</div>
+        </div>
+      </div>
+      <div class="roadmap">
+        {% for g in roadmap %}
+          {% set first_val = g.per_eval_score_needed.values()|list|first %}
+          <div class="roadmap-card {{ 'infeasible' if not g.feasible else '' }}">
+            <div class="roadmap-grade">{{ g.target_grade }}</div>
+            <div class="roadmap-cutoff">Cutoff {{ g.cutoff|int }}%</div>
+            <div class="roadmap-need">
+              {% if g.feasible %}
+                Need ≈ <strong>{{ "%.0f"|format(first_val) }}%</strong>
+                <span class="muted">on each remaining</span>
+              {% else %}
+                <span class="muted">Out of reach</span>
+              {% endif %}
+            </div>
+            <div class="roadmap-note">{{ g.note }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <div class="stack">
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Behavioural signals</div>
+          <div class="panel-sub">Non-academic indicators</div>
+        </div>
+      </div>
+      <table class="datatable datatable-compact">
+        <tbody>
+          <tr><td class="muted">Study hours / week</td><td class="mono">{{ r.study_hours }}</td></tr>
+          <tr><td class="muted">Self-reported stress</td>
+              <td class="mono">{{ r.stress }} / 10</td></tr>
+          <tr><td class="muted">Sleep / night</td><td class="mono">{{ r.sleep }}h</td></tr>
+          <tr><td class="muted">Extracurriculars</td><td>{{ r.extracurricular }}</td></tr>
+          <tr><td class="muted">Parent education</td><td>{{ r.parent_education }}</td></tr>
+          <tr><td class="muted">Graph engagement score</td>
+              <td class="mono">{{ "%.2f"|format(graph_score) }}</td></tr>
+          {% if agg.days_attended is defined %}
+            <tr><td class="muted">Days attended</td>
+                <td class="mono">{{ agg.days_attended|int }} / {{ agg.total_days|int }}</td></tr>
+            <tr><td class="muted">Total resource hits</td>
+                <td class="mono">{{ agg.total_resource_hits|int }}</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Personalised recommendation</div>
+          <div class="panel-sub">Rule-based diagnosis + greedy roadmap</div>
+        </div>
+      </div>
+      <div class="recommendation">{{ recommendation }}</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Send alert</div>
+          <div class="panel-sub">Simulated — writes to notifications log</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{{ url_for('edit_student', student_id=r.student_id) }}"
+           class="btn">✎ Edit details</a>
+        <button class="btn btn-primary" onclick="notify(false)">Notify student</button>
+        <button class="btn btn-danger" onclick="notify(true)">Notify student + parent</button>
+      </div>
+      <div id="notifyMsg" class="small muted" style="margin-top: 10px;"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if daily_logs %}
+const logs = {{ daily_logs | tojson }};
+new Chart(document.getElementById('dailyChart'), {
+  type: 'line',
+  data: {
+    labels: logs.map(l => 'Day ' + l.day),
+    datasets: [
+      {
+        label: 'Attended (0/1)',
+        data: logs.map(l => l.attended),
+        borderColor: '#1e3a5f',
+        backgroundColor: 'rgba(30, 58, 95, 0.08)',
+        fill: true, stepped: true, pointRadius: 0, borderWidth: 1.5,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Resource hits',
+        data: logs.map(l => l.resource_hits),
+        borderColor: '#b25000',
+        backgroundColor: 'rgba(178, 80, 0, 0.10)',
+        fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5,
+        yAxisID: 'y1',
+      },
+    ],
+  },
+  options: {
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      y:  { position: 'left',  beginAtZero: true, max: 1, ticks: { stepSize: 1 }, grid: { color: '#efebe0' } },
+      y1: { position: 'right', beginAtZero: true, grid: { display: false } },
+      x:  { ticks: { maxTicksLimit: 14 }, grid: { display: false } },
+    },
+  },
+});
+{% endif %}
+
+async function notify(withParent) {
+  const msg = document.getElementById('notifyMsg');
+  msg.textContent = 'Sending…';
+  try {
+    const res = await postJSON('/api/notify/{{ r.student_id }}', { notify_parent: withParent });
+    msg.textContent = res.ok
+      ? `✓ ${res.sent} notification(s) dispatched · logged to reports/notifications.jsonl`
+      : 'Failed to send.';
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+</script>
+{% endblock %}

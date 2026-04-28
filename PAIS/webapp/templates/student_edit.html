@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ r.full_name }} — {{ app_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .edit-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 14px 20px;
+    align-items: center;
+  }
+  .edit-grid label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+  .edit-grid .input-wrap { position: relative; }
+  .edit-grid input[type="number"],
+  .edit-grid input[type="range"],
+  .edit-grid select {
+    width: 100%;
+  }
+  .edit-grid input[type="range"] { accent-color: var(--accent); }
+  .live-preview {
+    position: sticky; top: 24px;
+    padding: 22px 26px;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+  }
+  .live-score {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 56px;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .score-delta {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin-top: 8px;
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+  .delta-up   { background: #f5e4e4; color: var(--risk-critical); }
+  .delta-down { background: #dde8e0; color: var(--risk-safe); }
+  .delta-same { background: var(--bg-subtle); color: var(--ink-muted); }
+  .field-error {
+    color: var(--risk-critical);
+    font-size: 11.5px;
+    font-family: var(--font-mono);
+    margin-top: 3px;
+  }
+  .error-border { border-color: var(--risk-critical); }
+
+  .range-with-number {
+    display: grid;
+    grid-template-columns: 1fr 70px;
+    gap: 10px;
+    align-items: center;
+  }
+  .range-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    text-align: right;
+  }
+
+  .actions-bar {
+    display: flex;
+    gap: 12px;
+    padding: 18px 0;
+    margin-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom: 14px;">
+  <a href="{{ url_for('student_detail', student_id=r.student_id) }}" class="small muted">
+    ← Back to {{ r.full_name }}
+  </a>
+</div>
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">Edit</div>
+    <h1 class="page-title">{{ r.full_name }}</h1>
+    <p class="page-subtitle">
+      Update any field — the risk score and band recompute live as you type,
+      so you can see exactly how a change affects this student's trajectory
+      before you save.
+    </p>
+  </div>
+</header>
+
+<form method="POST" id="editForm">
+
+  <div class="grid-2" style="grid-template-columns: 1.6fr 1fr;">
+
+    <!-- LEFT: form -->
+    <div class="stack">
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Academic inputs</div>
+          <div class="panel-sub">Values available 4-6 weeks before finals</div></div>
+        </div>
+
+        <div class="edit-grid">
+          {% for field_name, (col, lo, hi, caster) in numeric_fields.items() if field_name in ['attendance', 'midterm', 'assignments_avg', 'quizzes_avg', 'participation', 'projects'] %}
+            {% set current = (r|attr(field_name)) or 0 %}
+            <label for="f-{{ field_name }}">{{ col }}</label>
+            <div class="input-wrap">
+              <div class="range-with-number">
+                <input type="range" min="{{ lo }}" max="{{ hi }}" step="0.1"
+                       value="{{ '%.1f'|format(current) }}"
+                       data-attr="{{ field_name }}"
+                       oninput="document.getElementById('f-{{ field_name }}').value = this.value; simulate();">
+                <input type="number" id="f-{{ field_name }}" name="{{ field_name }}"
+                       min="{{ lo }}" max="{{ hi }}" step="0.1"
+                       value="{{ '%.1f'|format(current) }}"
+                       class="input {{ 'error-border' if attr in errors else '' }}"
+                       oninput="syncSlider(this); simulate();">
+              </div>
+              {% if errors.get(field_name) %}
+                <div class="field-error">{{ errors[field_name] }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Behavioural inputs</div>
+          <div class="panel-sub">Engagement and well-being indicators</div></div>
+        </div>
+        <div class="edit-grid">
+          {% for field_name, (col, lo, hi, caster) in numeric_fields.items() if field_name in ['study_hours', 'stress', 'sleep'] %}
+            {% set current = (r|attr(field_name)) or 0 %}
+            <label for="f-{{ field_name }}">{{ col }}</label>
+            <div class="input-wrap">
+              <div class="range-with-number">
+                <input type="range" min="{{ lo }}" max="{{ hi }}"
+                       step="{{ '1' if caster.__name__ == 'int' else '0.5' }}"
+                       value="{{ current }}"
+                       data-attr="{{ field_name }}"
+                       oninput="document.getElementById('f-{{ field_name }}').value = this.value; simulate();">
+                <input type="number" id="f-{{ field_name }}" name="{{ field_name }}"
+                       min="{{ lo }}" max="{{ hi }}"
+                       step="{{ '1' if caster.__name__ == 'int' else '0.5' }}"
+                       value="{{ current }}"
+                       class="input {{ 'error-border' if attr in errors else '' }}"
+                       oninput="syncSlider(this); simulate();">
+              </div>
+              {% if errors.get(field_name) %}
+                <div class="field-error">{{ errors[field_name] }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Demographics & context</div>
+          <div class="panel-sub">Categorical fields</div></div>
+        </div>
+        <div class="edit-grid">
+          <label for="f-age">Age</label>
+          <div>
+            <input type="number" id="f-age" name="age" class="input"
+                   min="15" max="80" value="{{ r.age }}" oninput="simulate();">
+            {% if errors.get('age') %}<div class="field-error">{{ errors['age'] }}</div>{% endif %}
+          </div>
+
+          {% for field_name, (col, choices) in categorical_fields.items() %}
+            {% set current = (r|attr(field_name)) or '' %}
+            <label for="f-{{ field_name }}">{{ col }}</label>
+            <div>
+              <select id="f-{{ field_name }}" name="{{ field_name }}" class="select"
+                      onchange="simulate();">
+                {% for choice in choices %}
+                  <option value="{{ choice }}" {% if current == choice %}selected{% endif %}>
+                    {{ choice }}
+                  </option>
+                {% endfor %}
+              </select>
+              {% if errors.get(field_name) %}<div class="field-error">{{ errors[field_name] }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="actions-bar">
+        <button type="submit" class="btn btn-primary">💾 Save changes</button>
+        <a href="{{ url_for('student_detail', student_id=r.student_id) }}" class="btn">Cancel</a>
+        <span class="small muted" style="margin-left: auto; align-self: center;">
+          Changes persist via <span class="mono">reports/edits_overlay.jsonl</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- RIGHT: sticky live preview -->
+    <div>
+      <div class="live-preview">
+        <div class="panel-sub" style="padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px;">
+          LIVE RISK PREVIEW
+        </div>
+        <div class="muted small" style="margin-bottom: 4px;">Current score</div>
+        <div class="live-score" id="liveScore"
+             style="color: var(--risk-{{ (r.risk_band or 'safe')|lower }});">
+          {{ "%.2f"|format(r.risk_score or 0) }}
+        </div>
+        <div style="margin-top: 10px;">
+          <span class="badge badge-{{ r.risk_band }}" id="liveBand">{{ r.risk_band }}</span>
+        </div>
+        <div id="liveDelta" class="score-delta delta-same">±0.000 vs saved</div>
+
+        <hr style="border: none; border-top: 1px solid var(--line); margin: 20px 0;">
+
+        <div class="muted small" style="margin-bottom: 8px;">Baseline (saved)</div>
+        <table class="datatable datatable-compact" style="font-size: 12px;">
+          <tbody>
+            <tr><td class="muted">Saved risk</td>
+                <td class="mono">{{ "%.3f"|format(r.risk_score or 0) }}</td></tr>
+            <tr><td class="muted">Saved band</td>
+                <td><span class="badge badge-{{ r.risk_band }}">{{ r.risk_band }}</span></td></tr>
+            <tr><td class="muted">Current grade</td>
+                <td><span class="grade-badge grade-{{ r.grade }}">{{ r.grade }}</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const BASELINE_SCORE = {{ r.risk_score or 0 }};
+const BASELINE_BAND  = "{{ r.risk_band }}";
+
+const BAND_COLORS = {
+  CRITICAL: 'var(--risk-critical)',
+  HIGH:     'var(--risk-high)',
+  MODERATE: 'var(--risk-moderate)',
+  LOW:      'var(--risk-low)',
+  SAFE:     'var(--risk-safe)',
+};
+
+function syncSlider(numberInput) {
+  // Keep the paired range slider in lock-step with the number input
+  const form = numberInput.closest('form');
+  const slider = form.querySelector(`input[type="range"][data-attr="${numberInput.name}"]`);
+  if (slider) slider.value = numberInput.value;
+}
+
+// Debounced live simulate
+let simulateTimer = null;
+function simulate() {
+  clearTimeout(simulateTimer);
+  simulateTimer = setTimeout(runSimulate, 150);
+}
+
+async function runSimulate() {
+  const form = document.getElementById('editForm');
+  const fd = new FormData(form);
+  const payload = {};
+  for (const [k, v] of fd.entries()) {
+    if (v !== '') payload[k] = v;
+  }
+  try {
+    const res = await postJSON('/api/student/{{ r.student_id }}/simulate', payload);
+    if (res.error) return;
+    updatePreview(res.risk_score, res.risk_band, res.delta);
+  } catch (e) {
+    console.warn('simulate failed:', e);
+  }
+}
+
+function updatePreview(score, band, delta) {
+  const scoreEl = document.getElementById('liveScore');
+  const bandEl = document.getElementById('liveBand');
+  const deltaEl = document.getElementById('liveDelta');
+
+  scoreEl.textContent = score.toFixed(2);
+  scoreEl.style.color = BAND_COLORS[band];
+
+  bandEl.textContent = band;
+  bandEl.className = 'badge badge-' + band;
+
+  const sign = delta > 0 ? '+' : delta < 0 ? '' : '±';
+  deltaEl.textContent = `${sign}${delta.toFixed(3)} vs saved`;
+  deltaEl.className = 'score-delta ' + (
+    Math.abs(delta) < 0.005 ? 'delta-same' :
+    delta > 0 ? 'delta-up' : 'delta-down'
+  );
+}
+
+// Warm up once on load so the preview reflects exactly what's in the form.
+runSimulate();
+</script>
+{% endblock %}

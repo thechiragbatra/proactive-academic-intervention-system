@@ -1,0 +1,2 @@
+/student/:id    /student.html?id=:id    200
+/*              /404.html               404

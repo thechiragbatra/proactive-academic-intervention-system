@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Analytics — {{ app_name }}{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">DSA Analytics</div>
+    <h1 class="page-title">Behavioural & Cohort Analytics</h1>
+    <p class="page-subtitle">
+      Algorithmic insights layered on top of the ML scores —
+      sliding windows flag sudden attendance collapses, gradient ranking
+      surfaces fast movers, bipartite-graph BFS finds disengaged students.
+    </p>
+  </div>
+</header>
+
+<section class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Anomalous windows</div>
+    <div class="kpi-value">{{ anomalies|length }}+</div>
+    <div class="kpi-foot">Sliding 7-day windows, one worst per student shown</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Graph edges</div>
+    <div class="kpi-value">{{ "{:,}".format(graph_summary.num_edges) }}</div>
+    <div class="kpi-foot">{{ graph_summary.num_students }} students ↔ {{ graph_summary.num_resources }} resources</div>
+  </div>
+  <div class="kpi kpi-critical">
+    <div class="kpi-label">Isolated students</div>
+    <div class="kpi-value">{{ graph_summary.isolated_count }}</div>
+    <div class="kpi-foot">BFS · &lt;2 connections</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Departments tracked</div>
+    <div class="kpi-value">{{ stats.dept_counts|length }}</div>
+    <div class="kpi-foot">Mean risk per dept on dashboard</div>
+  </div>
+</section>
+
+<section class="grid-2" style="margin-bottom: 22px;">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Top improvers</div>
+        <div class="panel-sub">midterm − early avg · stable Timsort O(n log n)</div>
+      </div>
+    </div>
+    <table class="datatable datatable-compact">
+      <thead>
+        <tr><th>Student</th><th>Early avg</th><th>Midterm</th><th>Δ</th></tr>
+      </thead>
+      <tbody>
+        {% for row in improvers %}
+        <tr>
+          <td><a href="{{ url_for('student_detail', student_id=row.Student_ID) }}">{{ row.Student_ID }}</a></td>
+          <td class="mono">{{ "%.1f"|format(row.early_academic_avg) }}</td>
+          <td class="mono">{{ "%.1f"|format(row.Midterm_Score) }}</td>
+          <td class="mono" style="color: var(--risk-safe);">+{{ "%.1f"|format(row.gradient) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Fastest decliners</div>
+        <div class="panel-sub">Needs urgent mentor attention</div>
+      </div>
+    </div>
+    <table class="datatable datatable-compact">
+      <thead>
+        <tr><th>Student</th><th>Early avg</th><th>Midterm</th><th>Δ</th></tr>
+      </thead>
+      <tbody>
+        {% for row in decliners %}
+        <tr>
+          <td><a href="{{ url_for('student_detail', student_id=row.Student_ID) }}">{{ row.Student_ID }}</a></td>
+          <td class="mono">{{ "%.1f"|format(row.early_academic_avg) }}</td>
+          <td class="mono">{{ "%.1f"|format(row.Midterm_Score) }}</td>
+          <td class="mono" style="color: var(--risk-critical);">{{ "%.1f"|format(row.gradient) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title">Attendance anomaly windows</div>
+      <div class="panel-sub">Sliding window 7d · flagged when mean &lt; 50% or variance exceeds threshold</div>
+    </div>
+    <span class="small muted">Showing worst 50 · sorted by mean attendance</span>
+  </div>
+  <table class="datatable">
+    <thead>
+      <tr>
+        <th>Student</th><th>Window</th>
+        <th>Mean attendance</th><th>Std dev</th><th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in anomalies %}
+      <tr>
+        <td><a href="{{ url_for('student_detail', student_id=a.Student_ID) }}">{{ a.Student_ID }}</a></td>
+        <td class="mono muted">Day {{ a.start_day }} → {{ a.end_day }}</td>
+        <td class="mono">{{ "%.2f"|format(a.mean_attended) }}</td>
+        <td class="mono">{{ "%.2f"|format(a.std_attended) }}</td>
+        <td>{{ a.reason }}</td>
+      </tr>
+      {% endfor %}
+      {% if not anomalies %}
+      <tr><td colspan="5" class="empty-state">No anomalies detected. Run <code>python main.py</code> first.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</section>
+
+{% endblock %}

@@ -1,0 +1,26 @@
+# Netlify deployment config for PAIS static site.
+# Run `python scripts/build_static.py` before deploying to refresh data/*.json.
+
+[build]
+  publish = "netlify_site"
+  # No build command — assets are pre-built locally and committed.
+
+[[headers]]
+  for = "/data/*.json"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/figures/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[redirects]]
+  from   = "/student/:id"
+  to     = "/student.html?id=:id"
+  status = 200

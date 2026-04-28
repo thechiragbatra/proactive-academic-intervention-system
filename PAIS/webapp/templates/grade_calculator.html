@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+{% block title %}Grade Calculator — {{ app_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .calc-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 22px;
+    }
+    @media (max-width: 1080px) {
+      .calc-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Component input rows in the left card */
+    .component-row {
+      display: grid;
+      grid-template-columns: 1fr 80px 60px;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .component-row:last-child { border-bottom: none; }
+    .component-name {
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .component-weight {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+    }
+    .component-input {
+      width: 80px;
+      padding: 7px 9px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      text-align: right;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .component-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    .component-input.invalid {
+      border-color: var(--risk-critical);
+      background: #faecec;
+    }
+    .out-of {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+
+    /* Sub-label that explains the Internals breakdown */
+    .internals-tag {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 1px 7px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 3px;
+    }
+
+    /* Total / current score readout */
+    .score-readout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .score-tile {
+      padding: 16px 18px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    .score-tile-label {
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+    .score-tile-value {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+      margin-top: 6px;
+      line-height: 1;
+    }
+    .score-tile-foot {
+      font-size: 11.5px;
+      color: var(--ink-soft);
+      margin-top: 6px;
+    }
+
+    /* Right column — grade roadmap cards */
+    .target-card {
+      display: grid;
+      grid-template-columns: 50px 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .target-card:hover { border-color: var(--line-strong); }
+    .target-card.feasible { border-left: 3px solid var(--risk-safe); }
+    .target-card.tight    { border-left: 3px solid var(--risk-moderate); }
+    .target-card.impossible {
+      border-left: 3px solid var(--risk-critical);
+      opacity: 0.78;
+    }
+    .target-grade {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 26px;
+      text-align: center;
+      width: 50px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-subtle);
+      border-radius: var(--radius);
+    }
+    .target-card.feasible .target-grade {
+      background: #dde8e0; color: var(--risk-safe);
+    }
+    .target-card.tight .target-grade {
+      background: #f4eccc; color: var(--risk-moderate);
+    }
+    .target-card.impossible .target-grade {
+      background: #f5e4e4; color: var(--risk-critical);
+    }
+    .target-detail-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+    .target-detail-value {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    .target-status {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+    .status-yes  { background: #dde8e0; color: var(--risk-safe); }
+    .status-tight{ background: #f4eccc; color: var(--risk-moderate); }
+    .status-no   { background: #f5e4e4; color: var(--risk-critical); }
+
+    .targets-stack {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    /* Helper banner */
+    .calc-helper {
+      padding: 14px 18px;
+      background: var(--accent-soft);
+      border: 1px solid #d3dde9;
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--accent);
+      margin-bottom: 18px;
+    }
+    .calc-helper strong { font-weight: 600; }
+
+    .weight-bar {
+      display: flex;
+      height: 14px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+      border: 1px solid var(--line);
+    }
+    .weight-seg {
+      transition: filter 0.15s;
+    }
+    .weight-seg:hover { filter: brightness(0.92); }
+    .weight-seg-mid    { background: #b7c5d5; }
+    .weight-seg-quiz   { background: #c5d3a8; }
+    .weight-seg-tests  { background: #d8c8a0; }
+    .weight-seg-class  { background: #e0bba0; }
+    .weight-seg-end    { background: var(--accent); }
+    .weight-legend {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      font-size: 11.5px; color: var(--ink-soft);
+      margin-top: 10px;
+    }
+    .weight-legend span {
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .weight-legend i {
+      width: 10px; height: 10px;
+      border-radius: 2px; display: inline-block;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<header class="page-head">
+      <div>
+        <div class="page-eyebrow">DSA Engine · Grade Calculator</div>
+        <h1 class="page-title">Grade Calculator</h1>
+        <p class="page-subtitle">
+          Plan your end-semester strategy. Enter your component scores and see exactly
+          how many marks you need on the End Sem to achieve each target grade.
+        </p>
+      </div>
+    </header>
+
+    <div class="calc-helper">
+      <strong>Weight distribution:</strong> Mid Sem 20% · Quiz 20% · Tests 20% · Class Performance 10% · End Sem 30%.
+      <br>The first four components together form 70% of your final grade; the End Sem accounts for the remaining 30%.
+      <div class="weight-bar">
+        <div class="weight-seg weight-seg-mid"   style="width: 20%;" title="Mid Sem 20%"></div>
+        <div class="weight-seg weight-seg-quiz"  style="width: 20%;" title="Quiz 20%"></div>
+        <div class="weight-seg weight-seg-tests" style="width: 20%;" title="Tests 20%"></div>
+        <div class="weight-seg weight-seg-class" style="width: 10%;" title="Class Perf 10%"></div>
+        <div class="weight-seg weight-seg-end"   style="width: 30%;" title="End Sem 30%"></div>
+      </div>
+      <div class="weight-legend">
+        <span><i class="weight-seg-mid"></i> Mid Sem 20%</span>
+        <span><i class="weight-seg-quiz"></i> Quiz 20%</span>
+        <span><i class="weight-seg-tests"></i> Tests 20%</span>
+        <span><i class="weight-seg-class"></i> Class Perf 10%</span>
+        <span><i class="weight-seg-end"></i> End Sem 30%</span>
+      </div>
+    </div>
+
+    <div class="calc-grid">
+      <!-- ======== LEFT: Inputs ======== -->
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Component scores</div>
+            <div class="panel-sub">Enter each as a percentage (0–100)</div>
+          </div>
+          <button id="resetBtn" class="btn">Reset</button>
+        </div>
+
+        <div class="component-row">
+          <div>
+            <div class="component-name">Mid Semester Exam</div>
+            <div class="component-weight">Weight 20%</div>
+          </div>
+          <input type="number" id="midSem" class="component-input"
+                 min="0" max="100" step="0.1" value="0" placeholder="0">
+          <span class="out-of">/ 100</span>
+        </div>
+
+        <div class="component-row">
+          <div>
+            <div class="component-name">Quiz <span class="internals-tag">Internals</span></div>
+            <div class="component-weight">Weight 20%</div>
+          </div>
+          <input type="number" id="quiz" class="component-input"
+                 min="0" max="100" step="0.1" value="0" placeholder="0">
+          <span class="out-of">/ 100</span>
+        </div>
+
+        <div class="component-row">
+          <div>
+            <div class="component-name">Tests <span class="internals-tag">Internals</span></div>
+            <div class="component-weight">Weight 20%</div>
+          </div>
+          <input type="number" id="tests" class="component-input"
+                 min="0" max="100" step="0.1" value="0" placeholder="0">
+          <span class="out-of">/ 100</span>
+        </div>
+
+        <div class="component-row">
+          <div>
+            <div class="component-name">Class Performance <span class="internals-tag">Internals</span></div>
+            <div class="component-weight">Weight 10%</div>
+          </div>
+          <input type="number" id="classPerf" class="component-input"
+                 min="0" max="100" step="0.1" value="0" placeholder="0">
+          <span class="out-of">/ 100</span>
+        </div>
+
+        <div class="component-row" style="background: var(--bg-subtle); margin: 0 -24px -22px; padding: 16px 24px; border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
+          <div>
+            <div class="component-name">End Semester Exam</div>
+            <div class="component-weight">Weight 30% · Optional input</div>
+          </div>
+          <input type="number" id="endSem" class="component-input"
+                 min="0" max="100" step="0.1" placeholder="—">
+          <span class="out-of">/ 100</span>
+        </div>
+      </div>
+
+      <!-- ======== RIGHT: Results & Roadmap ======== -->
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Your scores</div>
+              <div class="panel-sub">Computed live from the inputs on the left</div>
+            </div>
+          </div>
+
+          <div class="score-readout">
+            <div class="score-tile">
+              <div class="score-tile-label">Earned so far</div>
+              <div class="score-tile-value" id="earnedScore">0.00</div>
+              <div class="score-tile-foot">Out of 70 (excluding End Sem)</div>
+            </div>
+            <div class="score-tile">
+              <div class="score-tile-label">Projected total</div>
+              <div class="score-tile-value" id="projectedTotal">—</div>
+              <div class="score-tile-foot" id="projectedFoot">Enter End Sem to see total</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Grade roadmap</div>
+              <div class="panel-sub">Required End Sem score for each grade target</div>
+            </div>
+          </div>
+          <div class="targets-stack" id="targetsList">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+/* ============================================================================
+   Grade Calculator logic
+   ----------------------------------------------------------------------------
+   Weight distribution (must total 100):
+     midSem    : 20%
+     quiz      : 20%   ┐
+     tests     : 20%   ├ Internals total = 50%
+     classPerf : 10%   ┘
+     endSem    : 30%
+
+   Final = midSem*0.20 + quiz*0.20 + tests*0.20 + classPerf*0.10 + endSem*0.30
+   Earned (without end sem) = first four terms — max 70 marks.
+   Required End Sem % to hit a grade with cutoff C:
+     required = (C - earned) / 0.30
+     If required > 100 → impossible
+     If required <= 0  → already achieved (just don't bomb End Sem)
+   ============================================================================ */
+
+// Component weights — change here once if curriculum updates.
+const WEIGHTS = {
+  midSem: 0.20,
+  quiz: 0.20,
+  tests: 0.20,
+  classPerf: 0.10,
+  endSem: 0.30,
+};
+
+// UPES grade cutoffs (highest first).
+const GRADE_TARGETS = [
+  { grade: 'O',  cutoff: 90, label: 'Outstanding' },
+  { grade: 'A+', cutoff: 80, label: 'Excellent'   },
+  { grade: 'A',  cutoff: 70, label: 'Very Good'   },
+  { grade: 'B+', cutoff: 60, label: 'Good'        },
+  { grade: 'B',  cutoff: 50, label: 'Above Average' },
+  { grade: 'C',  cutoff: 40, label: 'Average'     },
+  { grade: 'P',  cutoff: 35, label: 'Pass'        },
+];
+
+/** Read a component input safely. Returns NaN if blank or invalid. */
+function readNumeric(id) {
+  const el = document.getElementById(id);
+  const raw = el.value.trim();
+  if (raw === '') return NaN;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/** Validate a component value: allowed when 0..100. */
+function validate(id, v) {
+  const el = document.getElementById(id);
+  const ok = Number.isFinite(v) && v >= 0 && v <= 100;
+  el.classList.toggle('invalid', !ok && el.value.trim() !== '');
+  return ok;
+}
+
+/** Calculate earned marks (out of 70) from the four non-end-sem components. */
+function calcEarned(midSem, quiz, tests, classPerf) {
+  return midSem * WEIGHTS.midSem
+       + quiz * WEIGHTS.quiz
+       + tests * WEIGHTS.tests
+       + classPerf * WEIGHTS.classPerf;
+}
+
+/** Required End Sem percentage to hit a target final score. */
+function requiredEndSem(earned, targetTotal) {
+  // earned + endSemPct * 0.30 = targetTotal  →  endSemPct = (targetTotal - earned) / 0.30
+  return (targetTotal - earned) / WEIGHTS.endSem;
+}
+
+/** Map a final total score to its letter grade. */
+function gradeFromTotal(total) {
+  for (const t of GRADE_TARGETS) {
+    if (total >= t.cutoff) return t.grade;
+  }
+  return 'F';
+}
+
+/** Render a single target-row into HTML. */
+function renderTarget(t, earned) {
+  const required = requiredEndSem(earned, t.cutoff);
+  let cls, status, valueText, note;
+
+  if (required <= 0) {
+    cls = 'feasible';
+    status = '<span class="target-status status-yes">✓ Locked in</span>';
+    valueText = '0%';
+    note = 'Already achieved — any End Sem score keeps this grade.';
+  } else if (required <= 60) {
+    cls = 'feasible';
+    status = '<span class="target-status status-yes">✓ Comfortable</span>';
+    valueText = required.toFixed(1) + '%';
+    note = 'Well within reach with normal preparation.';
+  } else if (required <= 100) {
+    cls = 'tight';
+    status = '<span class="target-status status-tight">⚠ Tight</span>';
+    valueText = required.toFixed(1) + '%';
+    note = 'Possible but demands a strong End Sem performance.';
+  } else {
+    cls = 'impossible';
+    status = '<span class="target-status status-no">✕ Not possible</span>';
+    valueText = required.toFixed(1) + '%';
+    note = `Out of reach — would need ${required.toFixed(1)}% which exceeds 100.`;
+  }
+
+  return `
+    <div class="target-card ${cls}">
+      <div class="target-grade">${t.grade}</div>
+      <div>
+        <div class="target-detail-label">${t.label} · cutoff ${t.cutoff}%</div>
+        <div class="target-detail-value">Need <strong>${valueText}</strong> on End Sem</div>
+        <div class="small muted" style="margin-top: 3px;">${note}</div>
+      </div>
+      <div>${status}</div>
+    </div>`;
+}
+
+/** Re-evaluate everything and update the DOM. Called on every input change. */
+function recompute() {
+  const midSem    = readNumeric('midSem');
+  const quiz      = readNumeric('quiz');
+  const tests     = readNumeric('tests');
+  const classPerf = readNumeric('classPerf');
+  const endSem    = readNumeric('endSem');
+
+  // Validation visual feedback. Treat blank as 0 for math but flag invalid.
+  validate('midSem',    midSem);
+  validate('quiz',      quiz);
+  validate('tests',     tests);
+  validate('classPerf', classPerf);
+  validate('endSem',    endSem);
+
+  const m = Number.isFinite(midSem)    ? midSem    : 0;
+  const q = Number.isFinite(quiz)      ? quiz      : 0;
+  const t = Number.isFinite(tests)     ? tests     : 0;
+  const c = Number.isFinite(classPerf) ? classPerf : 0;
+
+  const earned = calcEarned(m, q, t, c);
+  document.getElementById('earnedScore').textContent = earned.toFixed(2);
+
+  // Projected total — only meaningful when End Sem is filled in.
+  const projEl = document.getElementById('projectedTotal');
+  const projFootEl = document.getElementById('projectedFoot');
+  if (Number.isFinite(endSem)) {
+    const total = earned + endSem * WEIGHTS.endSem;
+    const grade = gradeFromTotal(total);
+    projEl.textContent = total.toFixed(2);
+    projEl.style.color = total >= 80 ? 'var(--risk-safe)' :
+                         total >= 50 ? 'var(--ink)' :
+                         'var(--risk-critical)';
+    projFootEl.innerHTML = `Predicted grade: <strong>${grade}</strong> (out of 100)`;
+  } else {
+    projEl.textContent = '—';
+    projEl.style.color = 'var(--ink-faint)';
+    projFootEl.textContent = 'Enter End Sem to see total';
+  }
+
+  // Render the 7 target cards.
+  document.getElementById('targetsList').innerHTML =
+    GRADE_TARGETS.map(target => renderTarget(target, earned)).join('');
+}
+
+// Wire up every input + the reset button.
+['midSem', 'quiz', 'tests', 'classPerf', 'endSem'].forEach(id => {
+  document.getElementById(id).addEventListener('input', recompute);
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  ['midSem', 'quiz', 'tests', 'classPerf'].forEach(id => {
+    document.getElementById(id).value = '0';
+  });
+  document.getElementById('endSem').value = '';
+  recompute();
+});
+
+// Initial render.
+recompute();
+
+</script>
+{% endblock %}

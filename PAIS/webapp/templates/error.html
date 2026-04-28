@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="padding: 80px 0; text-align: center;">
+  <div style="font-family: var(--font-display); font-size: 140px; font-weight: 500;
+              color: var(--line-strong); line-height: 1; letter-spacing: -0.04em;">
+    {{ code }}
+  </div>
+  <div style="font-family: var(--font-display); font-size: 24px; margin-top: 8px; color: var(--ink);">
+    {{ message }}
+  </div>
+  <div style="margin-top: 20px;">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary">← Back to dashboard</a>
+  </div>
+</div>
+{% endblock %}

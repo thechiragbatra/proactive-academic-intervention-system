@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">Machine Learning</div>
+        <h1 class="page-title">Model Performance</h1>
+        <p class="page-subtitle">
+          Three candidates trained offline; coefficients extracted and shipped as JSON.
+          Inference runs in your browser — see the edit page for live predictions.
+        </p>
+      </div>
+    </header>
+
+    <section class="kpi-row" id="kpiRow"></section>
+    <section class="panel" style="margin-bottom: 22px;" id="comparisonPanel"></section>
+
+    <section class="grid-3">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">Confusion matrix</div></div></div>
+        <img src="figures/confusion_matrix.png" alt="" style="width: 100%; border-radius: var(--radius);">
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">ROC curve</div></div></div>
+        <img src="figures/roc_curve.png" alt="" style="width: 100%; border-radius: var(--radius);">
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">Feature importance</div></div></div>
+        <img src="figures/feature_importance.png" alt="" style="width: 100%; border-radius: var(--radius);">
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top: 22px;" id="classReportPanel"></section>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script>
+(async function() {
+  let report;
+  try { report = await DATA.report(); }
+  catch { document.querySelector('.main').innerHTML = '<div class="empty-state">No training report.</div>'; return; }
+  const winner = report.winner;
+  const r = report.results[winner];
+  const wm = r.test_metrics;
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi kpi-accent">
+      <div class="kpi-label">Winner</div>
+      <div class="kpi-value" style="font-size: 22px; margin-top: 14px;">${winner}</div>
+      <div class="kpi-foot">Selected by highest test F1</div>
+    </div>
+    <div class="kpi"><div class="kpi-label">F1 Score</div>
+      <div class="kpi-value">${wm.f1}</div><div class="kpi-foot">Precision × recall harmonic mean</div></div>
+    <div class="kpi"><div class="kpi-label">ROC AUC</div>
+      <div class="kpi-value">${wm.roc_auc}</div><div class="kpi-foot">Discrimination ability</div></div>
+    <div class="kpi"><div class="kpi-label">Accuracy</div>
+      <div class="kpi-value">${wm.accuracy}</div><div class="kpi-foot">Overall correctness</div></div>
+  `;
+
+  document.getElementById('comparisonPanel').innerHTML = `
+    <div class="panel-head"><div><div class="panel-title">Candidate comparison</div>
+    <div class="panel-sub">Held-out test + 5-fold CV</div></div></div>
+    <table class="datatable"><thead><tr>
+      <th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th>
+      <th>F1</th><th>ROC AUC</th><th>CV F1 (mean ± std)</th>
+    </tr></thead><tbody>
+      ${Object.entries(report.results).map(([name, res]) => `
+        <tr>
+          <td><strong>${name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</strong>
+          ${name === winner ? '<span class="badge badge-SAFE" style="margin-left:6px;">WINNER</span>' : ''}</td>
+          <td class="mono">${res.test_metrics.accuracy}</td>
+          <td class="mono">${res.test_metrics.precision}</td>
+          <td class="mono">${res.test_metrics.recall}</td>
+          <td class="mono">${res.test_metrics.f1}</td>
+          <td class="mono">${res.test_metrics.roc_auc}</td>
+          <td class="mono">${res.cv_f1_mean} ± ${res.cv_f1_std}</td>
+        </tr>`).join('')}
+    </tbody></table>`;
+
+  const rpt = r.report;
+  document.getElementById('classReportPanel').innerHTML = `
+    <div class="panel-head"><div><div class="panel-title">Classification report — ${winner}</div>
+    <div class="panel-sub">Per-class precision / recall / F1 on the test set</div></div></div>
+    <table class="datatable datatable-compact"><thead><tr>
+      <th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Support</th>
+    </tr></thead><tbody>
+      ${['0', '1'].filter(c => c in rpt).map(c => `
+        <tr>
+          <td>${c === '0' ? 'Safe (0)' : 'At-risk (1)'}</td>
+          <td class="mono">${rpt[c].precision.toFixed(3)}</td>
+          <td class="mono">${rpt[c].recall.toFixed(3)}</td>
+          <td class="mono">${rpt[c]['f1-score'].toFixed(3)}</td>
+          <td class="mono">${rpt[c].support}</td>
+        </tr>`).join('')}
+      <tr>
+        <td><strong>Macro avg</strong></td>
+        <td class="mono">${rpt['macro avg'].precision.toFixed(3)}</td>
+        <td class="mono">${rpt['macro avg'].recall.toFixed(3)}</td>
+        <td class="mono">${rpt['macro avg']['f1-score'].toFixed(3)}</td>
+        <td class="mono">${rpt['macro avg'].support}</td>
+      </tr>
+    </tbody></table>`;
+})();
+</script>
+</body>
+</html>

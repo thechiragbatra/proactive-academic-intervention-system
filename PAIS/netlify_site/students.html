@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Students — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">Roster</div>
+        <h1 class="page-title">Students</h1>
+        <p class="page-subtitle">
+          Every student, scored and ranked. Filter by risk band or department,
+          search by name or ID. Click any row for the full profile.
+        </p>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="filter-bar">
+        <input type="text" id="q" class="input" placeholder="Search name or ID…">
+        <select id="band" class="select">
+          <option value="">All bands</option>
+          <option value="CRITICAL">Critical</option>
+          <option value="HIGH">High</option>
+          <option value="MODERATE">Moderate</option>
+          <option value="LOW">Low</option>
+          <option value="SAFE">Safe</option>
+        </select>
+        <select id="department" class="select">
+          <option value="">All departments</option>
+          <option value="CS">CS</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Mathematics">Mathematics</option>
+          <option value="Business">Business</option>
+        </select>
+        <div style="margin-left: auto;" class="small muted" id="count">Loading…</div>
+      </div>
+
+      <table class="datatable">
+        <thead>
+          <tr>
+            <th>Student</th><th>Department</th><th>Attendance</th>
+            <th>Midterm</th><th>Grade</th><th>Risk</th><th>Band</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7" class="empty-state">Loading students…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script>
+(async function() {
+  const allRows = applyEditsToSummaries(await DATA.students());
+  allRows.sort((a, b) => b.risk_score - a.risk_score);
+
+  const qEl = document.getElementById('q');
+  const bandEl = document.getElementById('band');
+  const deptEl = document.getElementById('department');
+  const tbody = document.getElementById('tbody');
+  const countEl = document.getElementById('count');
+
+  function render() {
+    const q = qEl.value.toLowerCase().trim();
+    const band = bandEl.value;
+    const dept = deptEl.value;
+    const filtered = allRows.filter(r => {
+      if (band && r.risk_band !== band) return false;
+      if (dept && r.department !== dept) return false;
+      if (q && !r.name.toLowerCase().includes(q) && !r.student_id.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const showing = filtered.slice(0, 300);
+    countEl.textContent = `${showing.length.toLocaleString()} of ${filtered.length.toLocaleString()} students`;
+    if (!showing.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No students match those filters.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = showing.map(r => `
+      <tr>
+        <td><a href="student.html?id=${r.student_id}">${r.name}</a>
+            <div class="mono muted small">${r.student_id}</div></td>
+        <td>${r.department}</td>
+        <td class="mono">${fmtPct(r.attendance, 1)}</td>
+        <td class="mono">${r.midterm.toFixed(1)}</td>
+        <td>${gradeBadge(r.grade)}</td>
+        <td class="mono">${fmtScore(r.risk_score)}</td>
+        <td>${bandBadge(r.risk_band)}</td>
+      </tr>
+    `).join('');
+  }
+
+  let timer = null;
+  const debounce = () => { clearTimeout(timer); timer = setTimeout(render, 120); };
+  qEl.addEventListener('input', debounce);
+  bandEl.addEventListener('change', render);
+  deptEl.addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>

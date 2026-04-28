@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Score New Cohort — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">Batch Scoring</div>
+        <h1 class="page-title">Score a New Cohort</h1>
+        <p class="page-subtitle">
+          Drop a CSV with the same schema as the training data. Scoring happens entirely
+          in your browser using the extracted model — nothing is uploaded anywhere.
+        </p>
+      </div>
+    </header>
+
+    <div id="dropWrap">
+      <div class="drop-zone">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8a8f95"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <div style="font-family: var(--font-display); font-size: 20px; margin-bottom: 4px;">Drop your CSV here</div>
+        <div class="muted small">Up to 20 MB · scored in-browser · zero network</div>
+        <input type="file" id="fileInput" accept=".csv">
+      </div>
+    </div>
+
+    <div id="resultsWrap" style="display: none;"></div>
+
+    <div class="panel" style="margin-top: 22px;" id="schemaPanel">
+      <div class="panel-head"><div><div class="panel-title">Expected columns</div></div></div>
+      <div class="mono small" style="line-height: 1.8;">
+        Student_ID, First_Name, Last_Name, Email, Gender, Age, Department,
+        Attendance (%), Midterm_Score, Assignments_Avg, Quizzes_Avg, Participation_Score,
+        Projects_Score, Study_Hours_per_Week, Extracurricular_Activities,
+        Internet_Access_at_Home, Parent_Education_Level, Family_Income_Level,
+        Stress_Level (1-10), Sleep_Hours_per_Night
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script src="assets/js/ml.js"></script>
+<script>
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function csvToObjects(text) {
+  const rows = parseCSV(text).filter(r => r.some(c => c !== ''));
+  if (!rows.length) return [];
+  const headers = rows[0];
+  return rows.slice(1).map(r => {
+    const o = {};
+    headers.forEach((h, i) => { o[h] = r[i]; });
+    return o;
+  });
+}
+
+function objectsToCSV(objs) {
+  if (!objs.length) return '';
+  const headers = Object.keys(objs[0]);
+  const esc = v => {
+    if (v == null) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers.join(',')].concat(objs.map(o => headers.map(h => esc(o[h])).join(','))).join('\n');
+}
+
+const REQUIRED = [
+  'Student_ID', 'Attendance (%)', 'Midterm_Score', 'Assignments_Avg',
+  'Quizzes_Avg', 'Participation_Score', 'Projects_Score',
+  'Study_Hours_per_Week', 'Stress_Level (1-10)', 'Sleep_Hours_per_Night',
+  'Age', 'Gender', 'Department', 'Extracurricular_Activities',
+  'Internet_Access_at_Home', 'Parent_Education_Level', 'Family_Income_Level',
+];
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const rows = csvToObjects(text);
+  if (!rows.length) { flash('Empty CSV.', 'error'); return; }
+  const missing = REQUIRED.filter(c => !(c in rows[0]));
+  if (missing.length) { flash(`Missing columns: ${missing.join(', ')}`, 'error'); return; }
+
+  const model = await loadPAISModel('data/model.json');
+  const scored = rows.map(r => {
+    ['Attendance (%)', 'Midterm_Score', 'Assignments_Avg', 'Quizzes_Avg',
+     'Participation_Score', 'Projects_Score', 'Study_Hours_per_Week',
+     'Stress_Level (1-10)', 'Sleep_Hours_per_Night', 'Age']
+      .forEach(c => { if (r[c] !== '' && r[c] != null) r[c] = Number(r[c]); });
+    const { risk_score, risk_band } = model.score(r);
+    return { ...r, risk_score: risk_score.toFixed(4), risk_band };
+  });
+
+  const nAtRisk = scored.filter(r => r.risk_band === 'CRITICAL' || r.risk_band === 'HIGH').length;
+  const blob = new Blob([objectsToCSV(scored)], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+
+  document.getElementById('dropWrap').style.display = 'none';
+  document.getElementById('schemaPanel').style.display = 'none';
+  const wrap = document.getElementById('resultsWrap');
+  wrap.style.display = 'block';
+  wrap.innerHTML = `
+    <section class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Rows scored</div><div class="kpi-value">${scored.length}</div></div>
+      <div class="kpi kpi-critical"><div class="kpi-label">Flagged at-risk</div>
+        <div class="kpi-value">${nAtRisk}</div><div class="kpi-foot">Critical or High band</div></div>
+      <div class="kpi kpi-accent"><div class="kpi-label">Download</div>
+        <div style="margin-top: 12px;">
+          <a href="${url}" download="scored_${file.name}" class="btn btn-primary">Download scored CSV ↓</a>
+        </div></div>
+      <div class="kpi"><div class="kpi-label">Next</div>
+        <div style="margin-top: 12px;"><a href="upload.html" class="btn">Score another →</a></div></div>
+    </section>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">Preview · first 100 rows</div></div></div>
+      <table class="datatable datatable-compact">
+        <thead><tr>
+          <th>Student_ID</th><th>Name</th><th>Attendance</th>
+          <th>Midterm</th><th>Risk score</th><th>Band</th>
+        </tr></thead>
+        <tbody>
+          ${scored.slice(0, 100).map(r => `
+            <tr>
+              <td class="mono">${r.Student_ID}</td>
+              <td>${r.First_Name || ''} ${r.Last_Name || ''}</td>
+              <td class="mono">${Number(r['Attendance (%)']).toFixed(1)}</td>
+              <td class="mono">${Number(r.Midterm_Score).toFixed(1)}</td>
+              <td class="mono">${Number(r.risk_score).toFixed(3)}</td>
+              <td>${bandBadge(r.risk_band)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+});
+</script>
+</body>
+</html>

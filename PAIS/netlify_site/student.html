@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main" id="main">
+    <div class="empty-state">Loading…</div>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script>
+/* Grade roadmap — JS port of src/dsa/grade_optimizer.py */
+const GRADE_CUTOFFS = { O: 90, 'A+': 80, A: 70, 'B+': 60, B: 50, C: 40, P: 35 };
+const REMAINING_EVAL_WEIGHTS = {
+  final_exam: 0.40, final_project: 0.20,
+  remaining_quiz: 0.10, remaining_assign: 0.10,
+};
+const REMAINING_TOTAL = Object.values(REMAINING_EVAL_WEIGHTS).reduce((a,b)=>a+b, 0);
+
+function earnedWeightedMarks(midterm, assignments, quizzes, projects) {
+  const earnedWeight = 1.0 - REMAINING_TOTAL;
+  const avg = 0.40 * midterm + 0.25 * assignments + 0.20 * quizzes + 0.15 * projects;
+  return avg * earnedWeight;
+}
+
+function fullRoadmap(midterm, assignments, quizzes, projects) {
+  const earned = earnedWeightedMarks(midterm, assignments, quizzes, projects);
+  const grades = Object.entries(GRADE_CUTOFFS).sort((a, b) => b[1] - a[1]);
+  return grades.map(([grade, cutoff]) => {
+    const gap = cutoff - earned;
+    if (gap <= 0) {
+      return { target_grade: grade, cutoff, feasible: true, required_pct: 0,
+               note: "Already locked in — just don't drop off." };
+    }
+    const required_pct = gap / REMAINING_TOTAL;
+    const feasible = required_pct <= 100.0;
+    return {
+      target_grade: grade, cutoff, feasible, required_pct,
+      note: feasible ? 'Feasible — consistent effort required.'
+                     : `Out of reach: would need ${required_pct.toFixed(1)}% on every remaining eval.`
+    };
+  });
+}
+
+/* Recommendations — JS port of src/business/recommendations.py */
+const TIPS = {
+  attendance_low: '• Attendance below 60%. Meet your mentor — universities flag this on transcripts.',
+  attendance_mod: '• Attendance slipping toward 75% threshold. Attend every lecture this week for a buffer.',
+  midterm_low: '• Midterm weak. Ask faculty for answer-key review; rework your worst two topics.',
+  assignments_low: '• Assignments pulling overall score down. Submit next two 48h early for revision cycles.',
+  quizzes_low: '• Quiz scores show shallow prep. Use 20-minute daily retrieval practice for 3 weeks.',
+  participation_low: '• Class participation low. One real question per class + one discussion thread/week.',
+  projects_low: '• Project marks weak. Schedule one 90-min block/week just for project work.',
+  stress_high: '• Stress high. Campus counselling is free and confidential — one session helps.',
+  sleep_low: '• Under 6h sleep significantly hurts recall. Target 7+ hours on 5+ nights/week.',
+  study_hours_low: "• Under 10h studying outside class. Move to 15 meaningful hours across 5 days.",
+};
+
+function diagnose(r) {
+  const t = [];
+  if (r.attendance < 60) t.push(TIPS.attendance_low);
+  else if (r.attendance < 75) t.push(TIPS.attendance_mod);
+  if (r.midterm < 55) t.push(TIPS.midterm_low);
+  if (r.assignments_avg < 60) t.push(TIPS.assignments_low);
+  if (r.quizzes_avg < 60) t.push(TIPS.quizzes_low);
+  if (r.participation < 55) t.push(TIPS.participation_low);
+  if (r.projects < 55) t.push(TIPS.projects_low);
+  if (r.stress >= 8) t.push(TIPS.stress_high);
+  if (r.sleep < 6) t.push(TIPS.sleep_low);
+  if (r.study_hours < 10) t.push(TIPS.study_hours_low);
+  if (!t.length) t.push('• Profile looks healthy — keep the current routine.');
+  return t.join('\n');
+}
+
+function recommendationText(r) {
+  const d = diagnose(r);
+  const roadmap = fullRoadmap(r.midterm||0, r.assignments_avg||0, r.quizzes_avg||0, r.projects||0);
+  const feas = roadmap.filter(g => g.feasible).slice(0, 3);
+  const lines = feas.map(g =>
+    `  → Grade ${g.target_grade.padEnd(2)} (cutoff ${Math.round(g.cutoff)}%): need ≈ ${Math.round(g.required_pct)}% on each remaining evaluation.`
+  );
+  const rtxt = lines.length ? lines.join('\n')
+    : '  → All ambitious targets out of reach. Focus on a clean pass, then rebuild.';
+  return `Diagnostics:\n${d}\n\nGrade roadmap (min consistent % on remaining evals):\n${rtxt}`;
+}
+
+function notify(student, withParent) {
+  const store = readStore(STORE_NOTIFS);
+  const log = store.log || [];
+  const now = new Date().toISOString();
+  log.unshift({
+    student_id: student.student_id, to_email: student.email, recipient: 'student',
+    subject: student.risk_band === 'CRITICAL'
+      ? 'URGENT: Immediate Academic Review Required'
+      : 'Important: Academic Performance Audit',
+    risk_band: student.risk_band, created_at: now,
+  });
+  if (withParent) {
+    log.unshift({
+      student_id: student.student_id,
+      to_email: `parent_of_${student.student_id.toLowerCase()}@university.com`,
+      recipient: 'parent',
+      subject: `Academic Status Update for ${student.name}`,
+      risk_band: student.risk_band, created_at: now,
+    });
+  }
+  store.log = log.slice(0, 500);
+  writeStore(STORE_NOTIFS, store);
+  flash(`✓ ${withParent ? 2 : 1} notification(s) logged to browser storage`, 'success');
+}
+
+(async function() {
+  const sid = new URLSearchParams(location.search).get('id');
+  const main = document.getElementById('main');
+  if (!sid) {
+    main.innerHTML = '<div class="empty-state">No student ID provided. <a href="students.html">Back to list</a></div>';
+    return;
+  }
+
+  let r;
+  try { r = applyEditsTo(await DATA.student(sid)); }
+  catch { main.innerHTML = `<div class="empty-state">Student ${sid} not found. <a href="students.html">Back to list</a></div>`; return; }
+
+  const vitals = [
+    ['Attendance', r.attendance, '%'], ['Midterm', r.midterm, ''],
+    ['Assignments', r.assignments_avg, ''], ['Quizzes', r.quizzes_avg, ''],
+    ['Participation', r.participation, ''], ['Projects', r.projects, ''],
+  ];
+  const vitalsHTML = vitals.map(([label, val, unit]) => {
+    const v = val || 0;
+    const cls = v < 50 ? 'danger' : v < 65 ? 'warn' : v >= 80 ? 'good' : '';
+    return `<div class="vital">
+      <div class="vital-label">${label}</div>
+      <div class="vital-bar-track"><div class="vital-bar-fill ${cls}" style="width: ${v}%;"></div></div>
+      <div class="vital-value">${v.toFixed(1)}${unit}</div>
+    </div>`;
+  }).join('');
+
+  const roadmap = fullRoadmap(r.midterm||0, r.assignments_avg||0, r.quizzes_avg||0, r.projects||0);
+  const roadmapHTML = roadmap.map(g => `
+    <div class="roadmap-card ${g.feasible ? '' : 'infeasible'}">
+      <div class="roadmap-grade">${g.target_grade}</div>
+      <div class="roadmap-cutoff">Cutoff ${Math.round(g.cutoff)}%</div>
+      <div class="roadmap-need">
+        ${g.feasible
+          ? `Need ≈ <strong>${Math.round(g.required_pct)}%</strong> <span class="muted">on each remaining</span>`
+          : '<span class="muted">Out of reach</span>'}
+      </div>
+      <div class="roadmap-note">${g.note}</div>
+    </div>`).join('');
+
+  const dailyHTML = r.daily_logs && r.daily_logs.length ? `
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Daily engagement</div>
+        <div class="panel-sub">84-day attendance + resource access · sliding-window backing data</div></div>
+        ${r.anomaly ? `<span class="badge badge-HIGH">Flagged: ${r.anomaly.reason}</span>` : ''}
+      </div>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="dailyChart"></canvas></div>
+    </div>` : '';
+
+  main.innerHTML = `
+    <div style="margin-bottom: 14px;"><a href="students.html" class="small muted">← All students</a></div>
+
+    <div class="hero">
+      <div>
+        <h1 class="hero-name">${r.name}</h1>
+        <div class="hero-id">${r.student_id} · ${r.email}</div>
+        <div class="hero-meta">
+          <span>🎓 ${r.department}</span>
+          <span>👤 ${r.gender}, ${r.age}</span>
+          <span>💼 ${r.family_income || '—'} income</span>
+          <span>🏠 Internet: ${r.internet_access || '—'}</span>
+        </div>
+      </div>
+      <div class="risk-dial">
+        <div class="risk-dial-value" style="color: ${RISK_COLORS[r.risk_band]};">${r.risk_score.toFixed(2)}</div>
+        <div class="risk-dial-label">${bandBadge(r.risk_band)}</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Academic vitals</div>
+          <div class="panel-sub">Values available 4-6 weeks before finals</div></div></div>
+          <div class="vitals">${vitalsHTML}</div>
+        </div>
+        ${dailyHTML}
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Grade recovery roadmap</div>
+          <div class="panel-sub">Greedy optimizer · min % per remaining evaluation</div></div></div>
+          <div class="roadmap">${roadmapHTML}</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Behavioural signals</div></div></div>
+          <table class="datatable datatable-compact"><tbody>
+            <tr><td class="muted">Study hours / week</td><td class="mono">${r.study_hours}</td></tr>
+            <tr><td class="muted">Self-reported stress</td><td class="mono">${r.stress} / 10</td></tr>
+            <tr><td class="muted">Sleep / night</td><td class="mono">${r.sleep}h</td></tr>
+            <tr><td class="muted">Extracurriculars</td><td>${r.extracurricular}</td></tr>
+            <tr><td class="muted">Parent education</td><td>${r.parent_education}</td></tr>
+            <tr><td class="muted">Graph engagement score</td><td class="mono">${(r.graph_engagement||0).toFixed(2)}</td></tr>
+          </tbody></table>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Personalised recommendation</div>
+          <div class="panel-sub">Rule-based diagnosis + greedy roadmap</div></div></div>
+          <div class="recommendation">${recommendationText(r)}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Actions</div>
+          <div class="panel-sub">Edit fields or dispatch a (simulated) alert</div></div></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="edit.html?id=${r.student_id}" class="btn">✎ Edit details</a>
+            <button class="btn btn-primary" id="notifyBtn">Notify student</button>
+            <button class="btn btn-danger" id="notifyParentBtn">Notify student + parent</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('notifyBtn').onclick = () => notify(r, false);
+  document.getElementById('notifyParentBtn').onclick = () => notify(r, true);
+
+  if (r.daily_logs && r.daily_logs.length) {
+    new Chart(document.getElementById('dailyChart'), {
+      type: 'line',
+      data: {
+        labels: r.daily_logs.map(l => 'Day ' + l.day),
+        datasets: [
+          { label: 'Attended (0/1)', data: r.daily_logs.map(l => l.attended),
+            borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,0.08)',
+            fill: true, stepped: true, pointRadius: 0, borderWidth: 1.5, yAxisID: 'y' },
+          { label: 'Resource hits', data: r.daily_logs.map(l => l.resource_hits),
+            borderColor: '#b25000', backgroundColor: 'rgba(178,80,0,0.10)',
+            fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5, yAxisID: 'y1' },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          y:  { position: 'left', beginAtZero: true, max: 1, ticks: { stepSize: 1 }, grid: { color: '#efebe0' } },
+          y1: { position: 'right', beginAtZero: true, grid: { display: false } },
+          x:  { ticks: { maxTicksLimit: 14 }, grid: { display: false } },
+        },
+      },
+    });
+  }
+})();
+</script>
+</body>
+</html>

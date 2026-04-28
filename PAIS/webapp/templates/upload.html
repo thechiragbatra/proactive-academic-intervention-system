@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Score New Cohort — {{ app_name }}{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">Batch Scoring</div>
+    <h1 class="page-title">Score a New Cohort</h1>
+    <p class="page-subtitle">
+      Upload a CSV with the same schema as the training data. PAIS will score
+      every row using the trained model and return a downloadable file with
+      <span class="mono">risk_score</span> and <span class="mono">risk_band</span>
+      columns appended.
+    </p>
+  </div>
+</header>
+
+{% if not results %}
+
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('upload') }}">
+  <div class="drop-zone">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8a8f95"
+         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="17 8 12 3 7 8"></polyline>
+      <line x1="12" y1="3" x2="12" y2="15"></line>
+    </svg>
+    <div style="font-family: var(--font-display); font-size: 20px; margin-bottom: 4px;">
+      Drop your CSV here
+    </div>
+    <div class="muted small">Up to 20 MB · must include all training-time columns</div>
+    <input type="file" name="file" accept=".csv" required>
+    <button type="submit" class="btn btn-primary">Score cohort</button>
+  </div>
+</form>
+
+<div class="panel" style="margin-top: 22px;">
+  <div class="panel-head"><div><div class="panel-title">Expected columns</div></div></div>
+  <div class="mono small" style="line-height: 1.8;">
+    Student_ID, First_Name, Last_Name, Email, Gender, Age, Department,
+    Attendance (%), Midterm_Score, Assignments_Avg, Quizzes_Avg, Participation_Score,
+    Projects_Score, Study_Hours_per_Week, Extracurricular_Activities,
+    Internet_Access_at_Home, Parent_Education_Level, Family_Income_Level,
+    Stress_Level (1-10), Sleep_Hours_per_Night
+  </div>
+  <div class="small muted" style="margin-top: 10px;">
+    Final_Score, Total_Score, and Grade columns are ignored if present (they would be leakage).
+  </div>
+</div>
+
+{% else %}
+
+<section class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Rows scored</div>
+    <div class="kpi-value">{{ n_scored }}</div>
+  </div>
+  <div class="kpi kpi-critical">
+    <div class="kpi-label">Flagged at-risk</div>
+    <div class="kpi-value">{{ n_at_risk }}</div>
+    <div class="kpi-foot">Critical or High band</div>
+  </div>
+  <div class="kpi kpi-accent">
+    <div class="kpi-label">Download</div>
+    <div style="margin-top: 12px;">
+      <a href="{{ url_for('download_upload', filename=download_file) }}"
+         class="btn btn-primary">Download scored CSV ↓</a>
+    </div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Next</div>
+    <div style="margin-top: 12px;">
+      <a href="{{ url_for('upload') }}" class="btn">Score another →</a>
+    </div>
+  </div>
+</section>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title">Preview · first 100 rows</div>
+      <div class="panel-sub">Full results in the downloadable CSV</div>
+    </div>
+  </div>
+  <table class="datatable datatable-compact">
+    <thead>
+      <tr>
+        <th>Student_ID</th><th>Name</th><th>Attendance</th>
+        <th>Midterm</th><th>Risk score</th><th>Band</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td class="mono">{{ r.Student_ID }}</td>
+        <td>{{ r.First_Name }} {{ r.Last_Name }}</td>
+        <td class="mono">{{ "%.1f"|format(r['Attendance (%)']) }}</td>
+        <td class="mono">{{ "%.1f"|format(r.Midterm_Score) }}</td>
+        <td class="mono">{{ "%.3f"|format(r.risk_score) }}</td>
+        <td><span class="badge badge-{{ r.risk_band }}">{{ r.risk_band }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endif %}
+
+{% endblock %}

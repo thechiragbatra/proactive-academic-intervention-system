@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .edit-grid { display: grid; grid-template-columns: 200px 1fr; gap: 14px 20px; align-items: center; }
+    .edit-grid label { font-size: 12px; color: var(--ink-soft); text-align: right; }
+    .edit-grid input[type="number"], .edit-grid select, .edit-grid input[type="range"] { width: 100%; }
+    .edit-grid input[type="range"] { accent-color: var(--accent); }
+    .range-with-number { display: grid; grid-template-columns: 1fr 70px; gap: 10px; align-items: center; }
+    .live-preview { position: sticky; top: 24px; padding: 22px 26px;
+      background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+    .live-score { font-family: var(--font-display); font-weight: 600; font-size: 56px;
+      letter-spacing: -0.03em; line-height: 1; }
+    .score-delta { font-family: var(--font-mono); font-size: 13px; margin-top: 8px;
+      display: inline-block; padding: 3px 10px; border-radius: 4px; }
+    .delta-up   { background: #f5e4e4; color: var(--risk-critical); }
+    .delta-down { background: #dde8e0; color: var(--risk-safe); }
+    .delta-same { background: var(--bg-subtle); color: var(--ink-muted); }
+    .actions-bar { display: flex; gap: 12px; padding: 18px 0; margin-top: 22px; border-top: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main" id="main">
+    <div class="empty-state">Loading…</div>
+  </main>
+</div>
+
+<script src="assets/js/shared.js"></script>
+<script src="assets/js/ml.js"></script>
+<script>
+const NUMERIC_FIELDS = [
+  ['attendance',      'Attendance (%)',      0, 100, 0.1],
+  ['midterm',         'Midterm Score',       0, 100, 0.1],
+  ['assignments_avg', 'Assignments Avg',     0, 100, 0.1],
+  ['quizzes_avg',     'Quizzes Avg',         0, 100, 0.1],
+  ['participation',   'Participation Score', 0, 100, 0.1],
+  ['projects',        'Projects Score',      0, 100, 0.1],
+  ['study_hours',     'Study Hours / week',  0, 80,  0.5],
+  ['stress',          'Stress (1-10)',       1, 10,  1],
+  ['sleep',           'Sleep Hours / night', 0, 14,  0.5],
+  ['age',             'Age',                 15, 80, 1],
+];
+const CATEGORICAL_FIELDS = [
+  ['gender',           'Gender',           ['Male', 'Female', 'Other']],
+  ['department',       'Department',       ['CS', 'Engineering', 'Mathematics', 'Business']],
+  ['extracurricular',  'Extracurriculars', ['Yes', 'No']],
+  ['internet_access',  'Internet at Home', ['Yes', 'No']],
+  ['parent_education', 'Parent Education', ["None","High School","Bachelor's","Master's","PhD","Unknown"]],
+  ['family_income',    'Family Income',    ['Low', 'Medium', 'High']],
+];
+
+(async function() {
+  const sid = new URLSearchParams(location.search).get('id');
+  const main = document.getElementById('main');
+  if (!sid) { main.innerHTML = '<div class="empty-state">No student ID.</div>'; return; }
+
+  const [detail, model] = await Promise.all([
+    DATA.student(sid).then(applyEditsTo),
+    loadPAISModel('data/model.json'),
+  ]);
+  const baseline = { risk_score: detail.risk_score, risk_band: detail.risk_band };
+
+  const numField = (attr, label, lo, hi, step) => {
+    const v = detail[attr] ?? 0;
+    return `
+      <label for="f-${attr}">${label}</label>
+      <div class="range-with-number">
+        <input type="range" min="${lo}" max="${hi}" step="${step}" value="${v}" data-attr="${attr}">
+        <input type="number" id="f-${attr}" name="${attr}" class="input"
+               min="${lo}" max="${hi}" step="${step}" value="${v}">
+      </div>`;
+  };
+  const catField = (attr, label, choices) => {
+    const v = detail[attr] ?? '';
+    return `
+      <label for="f-${attr}">${label}</label>
+      <select id="f-${attr}" name="${attr}" class="select">
+        ${choices.map(c => `<option value="${c}" ${v===c?'selected':''}>${c}</option>`).join('')}
+      </select>`;
+  };
+
+  main.innerHTML = `
+    <div style="margin-bottom: 14px;"><a href="student.html?id=${sid}" class="small muted">← Back to ${detail.name}</a></div>
+    <header class="page-head">
+      <div>
+        <div class="page-eyebrow">Edit</div>
+        <h1 class="page-title">${detail.name}</h1>
+        <p class="page-subtitle">
+          Update any field — the risk score recalculates live as you type, powered
+          by the same logistic regression model running directly in your browser.
+        </p>
+      </div>
+    </header>
+    <form id="editForm">
+    <div class="grid-2" style="grid-template-columns: 1.6fr 1fr;">
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Academic inputs</div></div></div>
+          <div class="edit-grid">${NUMERIC_FIELDS.slice(0, 6).map(f => numField(...f)).join('')}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Behavioural inputs</div></div></div>
+          <div class="edit-grid">${NUMERIC_FIELDS.slice(6, 9).map(f => numField(...f)).join('')}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">Demographics & context</div></div></div>
+          <div class="edit-grid">
+            ${numField(...NUMERIC_FIELDS[9])}
+            ${CATEGORICAL_FIELDS.map(f => catField(...f)).join('')}
+          </div>
+        </div>
+        <div class="actions-bar">
+          <button type="button" class="btn btn-primary" id="saveBtn">💾 Save changes</button>
+          <a href="student.html?id=${sid}" class="btn">Cancel</a>
+          <span class="small muted" style="margin-left: auto; align-self: center;">
+            Edits persist in browser localStorage
+          </span>
+        </div>
+      </div>
+      <div>
+        <div class="live-preview">
+          <div class="panel-sub" style="padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px;">
+            LIVE RISK PREVIEW · BROWSER-SIDE ML
+          </div>
+          <div class="muted small" style="margin-bottom: 4px;">Current score</div>
+          <div class="live-score" id="liveScore" style="color: ${RISK_COLORS[baseline.risk_band]};">
+            ${baseline.risk_score.toFixed(2)}
+          </div>
+          <div style="margin-top: 10px;" id="liveBandHolder">${bandBadge(baseline.risk_band)}</div>
+          <div id="liveDelta" class="score-delta delta-same">±0.000 vs saved</div>
+          <hr style="border: none; border-top: 1px solid var(--line); margin: 20px 0;">
+          <div class="muted small" style="margin-bottom: 8px;">Baseline (saved)</div>
+          <table class="datatable datatable-compact" style="font-size: 12px;"><tbody>
+            <tr><td class="muted">Saved risk</td><td class="mono">${baseline.risk_score.toFixed(3)}</td></tr>
+            <tr><td class="muted">Saved band</td><td>${bandBadge(baseline.risk_band)}</td></tr>
+            <tr><td class="muted">Current grade</td><td>${gradeBadge(detail.grade)}</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    </form>`;
+
+  // Wire up input events
+  const form = document.getElementById('editForm');
+  form.querySelectorAll('input[type="range"]').forEach(s => {
+    const attr = s.dataset.attr;
+    const num = form.querySelector(`#f-${attr}`);
+    s.addEventListener('input', () => { num.value = s.value; simulate(); });
+    num.addEventListener('input', () => { s.value = num.value; simulate(); });
+  });
+  form.querySelectorAll('select').forEach(sel => sel.addEventListener('change', simulate));
+  form.querySelector('#f-age').addEventListener('input', simulate);
+
+  let simTimer = null;
+  function simulate() { clearTimeout(simTimer); simTimer = setTimeout(runSim, 120); }
+
+  function collectForm() {
+    const fd = new FormData(form);
+    const row = {};
+    for (const [k, v] of fd.entries()) row[k] = v;
+    for (const [k] of NUMERIC_FIELDS.concat(CATEGORICAL_FIELDS.map(([a])=>[a]))) {
+      if (row[k] == null || row[k] === '') row[k] = detail[k];
+    }
+    return row;
+  }
+
+  function runSim() {
+    const row = collectForm();
+    const { risk_score, risk_band } = model.score(row);
+    const delta = risk_score - baseline.risk_score;
+    document.getElementById('liveScore').textContent = risk_score.toFixed(2);
+    document.getElementById('liveScore').style.color = RISK_COLORS[risk_band];
+    document.getElementById('liveBandHolder').innerHTML = bandBadge(risk_band);
+    const dEl = document.getElementById('liveDelta');
+    const sign = delta > 0 ? '+' : delta < 0 ? '' : '±';
+    dEl.textContent = `${sign}${delta.toFixed(3)} vs saved`;
+    dEl.className = 'score-delta ' + (
+      Math.abs(delta) < 0.005 ? 'delta-same' :
+      delta > 0 ? 'delta-up' : 'delta-down'
+    );
+  }
+
+  document.getElementById('saveBtn').onclick = () => {
+    const row = collectForm();
+    for (const [k] of NUMERIC_FIELDS) {
+      if (row[k] != null && row[k] !== '') row[k] = Number(row[k]);
+    }
+    const { risk_score, risk_band } = model.score(row);
+    const edits = readStore(STORE_EDITS);
+    edits[sid] = { timestamp: new Date().toISOString(), fields: row, risk_score, risk_band };
+    writeStore(STORE_EDITS, edits);
+    flash(`Saved. New risk: ${risk_score.toFixed(3)} (${risk_band})`, 'success');
+    setTimeout(() => location.href = `student.html?id=${sid}`, 900);
+  };
+
+  runSim();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — {{ app_name }}{% endblock %}
+
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">Command Centre</div>
+    <h1 class="page-title">Intervention Overview</h1>
+    <p class="page-subtitle">
+      Real-time view of cohort risk — scored by a
+      <span class="mono">{{ winner or '—' }}</span> model with
+      F1 = <span class="mono">{{ top_metrics.get('f1', '—') }}</span>
+      and AUC = <span class="mono">{{ top_metrics.get('roc_auc', '—') }}</span>.
+    </p>
+  </div>
+  <div>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Score new cohort →</a>
+  </div>
+</header>
+
+<section class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Students Monitored</div>
+    <div class="kpi-value">{{ "{:,}".format(stats.total) }}</div>
+    <div class="kpi-foot">Across {{ stats.dept_counts|length }} departments</div>
+  </div>
+  <div class="kpi kpi-critical">
+    <div class="kpi-label">Critical + High</div>
+    <div class="kpi-value">{{ stats.critical_plus_high }}</div>
+    <div class="kpi-foot">
+      {{ '%.1f'|format(stats.critical_plus_high / stats.total * 100) }}% of cohort · immediate action
+    </div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Attendance Anomalies</div>
+    <div class="kpi-value">{{ anomaly_count }}</div>
+    <div class="kpi-foot">Sliding 7-day windows flagged</div>
+  </div>
+  <div class="kpi kpi-accent">
+    <div class="kpi-label">Avg Risk Score</div>
+    <div class="kpi-value">{{ "%.2f"|format(stats.avg_risk) }}</div>
+    <div class="kpi-foot">0.00 (safe) → 1.00 (critical)</div>
+  </div>
+</section>
+
+<section class="grid-2" style="margin-bottom: 22px;">
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Risk band distribution</div>
+        <div class="panel-sub">Where the cohort sits on the risk spectrum</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="bandChart"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Top-10 at-risk</div>
+        <div class="panel-sub">Max-heap peek · O(k log n)</div>
+      </div>
+      <a href="{{ url_for('students_list') }}" class="small">View all →</a>
+    </div>
+    <table class="datatable datatable-compact">
+      <thead>
+        <tr><th>#</th><th>Student</th><th>Band</th><th>Score</th></tr>
+      </thead>
+      <tbody>
+        {% for sid, score, meta in top10 %}
+        <tr>
+          <td class="mono muted">{{ loop.index }}</td>
+          <td>
+            <a href="{{ url_for('student_detail', student_id=sid) }}">{{ meta.name }}</a>
+            <div class="mono muted small">{{ sid }} · {{ meta.department }}</div>
+          </td>
+          <td><span class="badge badge-{{ meta.band }}">{{ meta.band }}</span></td>
+          <td class="mono">{{ "%.3f"|format(score) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Risk by department</div>
+        <div class="panel-sub">Mean blended risk score</div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="deptChart"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">System snapshot</div>
+        <div class="panel-sub">DSA subsystems · live</div>
+      </div>
+    </div>
+    <table class="datatable datatable-compact">
+      <tbody>
+        <tr>
+          <td class="muted">Student-resource graph</td>
+          <td class="mono">{{ graph_summary.num_students }} students ↔ {{ graph_summary.num_resources }} resources</td>
+        </tr>
+        <tr>
+          <td class="muted">Graph edges</td>
+          <td class="mono">{{ "{:,}".format(graph_summary.num_edges) }}</td>
+        </tr>
+        <tr>
+          <td class="muted">Isolated students (BFS)</td>
+          <td class="mono">{{ graph_summary.isolated_count }}</td>
+        </tr>
+        <tr>
+          <td class="muted">Attendance anomalies (sliding window)</td>
+          <td class="mono">{{ anomaly_count }}</td>
+        </tr>
+        <tr>
+          <td class="muted">Best model</td>
+          <td class="mono">{{ winner }}</td>
+        </tr>
+        <tr>
+          <td class="muted">Test F1 · AUC</td>
+          <td class="mono">{{ top_metrics.get('f1', '—') }} · {{ top_metrics.get('roc_auc', '—') }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const bands = {{ stats.bands | tojson }};
+  new Chart(document.getElementById('bandChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(bands),
+      datasets: [{
+        data: Object.values(bands),
+        backgroundColor: Object.keys(bands).map(b => RISK_COLORS[b]),
+        borderRadius: 4,
+        barThickness: 44,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: '#efebe0' }, ticks: { precision: 0 } },
+        x: { grid: { display: false } },
+      },
+    },
+  });
+
+  const deptAvg = {{ stats.dept_avg_risk | tojson }};
+  const deptCt = {{ stats.dept_counts | tojson }};
+  const labels = Object.keys(deptAvg);
+  new Chart(document.getElementById('deptChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: labels.map(l => deptAvg[l]),
+        backgroundColor: '#1e3a5f',
+        borderRadius: 4,
+        barThickness: 40,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { afterBody: (ctx) => `n = ${deptCt[ctx[0].label]}` } },
+      },
+      scales: {
+        x: { min: 0, max: 1, grid: { color: '#efebe0' } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+</script>
+{% endblock %}

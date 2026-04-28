@@ -1,0 +1,39 @@
+{
+  "total": 5000,
+  "bands": {
+    "CRITICAL": 0,
+    "HIGH": 1089,
+    "MODERATE": 1068,
+    "LOW": 955,
+    "SAFE": 1888
+  },
+  "critical_plus_high": 1089,
+  "dept_counts": {
+    "Mathematics": 1223,
+    "Business": 1264,
+    "Engineering": 1274,
+    "CS": 1239
+  },
+  "dept_avg_risk": {
+    "Mathematics": 0.351,
+    "Business": 0.331,
+    "Engineering": 0.347,
+    "CS": 0.35
+  },
+  "avg_risk": 0.345,
+  "graph_summary": {
+    "num_students": 5000,
+    "num_resources": 12,
+    "num_edges": 59987,
+    "isolated_count": 0
+  },
+  "anomaly_count": 4890,
+  "winner": "logistic_regression",
+  "test_metrics": {
+    "accuracy": 0.798,
+    "precision": 0.7309,
+    "recall": 0.799,
+    "f1": 0.7635,
+    "roc_auc": 0.8874
+  }
+}

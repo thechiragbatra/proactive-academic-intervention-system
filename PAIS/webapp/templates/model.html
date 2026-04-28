@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Model — {{ app_name }}{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">Machine Learning</div>
+    <h1 class="page-title">Model Performance</h1>
+    <p class="page-subtitle">
+      Three candidates trained and compared on a held-out 20% test split with 5-fold CV.
+      The winner is persisted to <span class="mono">models/risk_model.pkl</span> and
+      serves live predictions across this dashboard.
+    </p>
+  </div>
+</header>
+
+{% if report and report.results %}
+{% set winner_result = report.results[report.winner] %}
+{% set wm = winner_result.test_metrics %}
+
+<section class="kpi-row">
+  <div class="kpi kpi-accent">
+    <div class="kpi-label">Winner</div>
+    <div class="kpi-value" style="font-size: 22px; margin-top: 14px;">{{ report.winner }}</div>
+    <div class="kpi-foot">Selected by highest test F1</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">F1 Score</div>
+    <div class="kpi-value">{{ wm.f1 }}</div>
+    <div class="kpi-foot">Harmonic mean of precision & recall</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">ROC AUC</div>
+    <div class="kpi-value">{{ wm.roc_auc }}</div>
+    <div class="kpi-foot">Discrimination ability</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Accuracy</div>
+    <div class="kpi-value">{{ wm.accuracy }}</div>
+    <div class="kpi-foot">Overall correctness</div>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom: 22px;">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title">Candidate comparison</div>
+      <div class="panel-sub">Held-out test + 5-fold cross-validation</div>
+    </div>
+  </div>
+  <table class="datatable">
+    <thead>
+      <tr>
+        <th>Model</th><th>Accuracy</th><th>Precision</th>
+        <th>Recall</th><th>F1</th><th>ROC AUC</th>
+        <th>CV F1 (mean ± std)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, r in report.results.items() %}
+        {% set m = r.test_metrics %}
+        <tr>
+          <td>
+            <strong>{{ name.replace('_', ' ').title() }}</strong>
+            {% if name == report.winner %}<span class="badge badge-SAFE" style="margin-left: 6px;">WINNER</span>{% endif %}
+          </td>
+          <td class="mono">{{ m.accuracy }}</td>
+          <td class="mono">{{ m.precision }}</td>
+          <td class="mono">{{ m.recall }}</td>
+          <td class="mono">{{ m.f1 }}</td>
+          <td class="mono">{{ m.roc_auc }}</td>
+          <td class="mono">{{ r.cv_f1_mean }} ± {{ r.cv_f1_std }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="grid-3">
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Confusion matrix</div></div></div>
+    <img src="/figures/confusion_matrix.png"
+         onerror="this.outerHTML='<div class=empty-state>Run <code>python -m src.ml.evaluate</code> to generate figures.</div>'"
+         alt="Confusion matrix" style="width: 100%; border-radius: var(--radius);">
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">ROC curve</div></div></div>
+    <img src="/figures/roc_curve.png" onerror="this.style.display='none'"
+         alt="ROC curve" style="width: 100%; border-radius: var(--radius);">
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Feature importance</div></div></div>
+    <img src="/figures/feature_importance.png" onerror="this.style.display='none'"
+         alt="Feature importance" style="width: 100%; border-radius: var(--radius);">
+  </div>
+</section>
+
+<section class="panel" style="margin-top: 22px;">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title">Classification report — {{ report.winner }}</div>
+      <div class="panel-sub">Per-class precision / recall / F1 on the test set</div>
+    </div>
+  </div>
+  {% set rpt = winner_result.report %}
+  <table class="datatable datatable-compact">
+    <thead>
+      <tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Support</th></tr>
+    </thead>
+    <tbody>
+      {% for cls in ['0', '1'] %}
+        {% if cls in rpt %}
+        <tr>
+          <td>{{ 'Safe (0)' if cls == '0' else 'At-risk (1)' }}</td>
+          <td class="mono">{{ "%.3f"|format(rpt[cls].precision) }}</td>
+          <td class="mono">{{ "%.3f"|format(rpt[cls].recall) }}</td>
+          <td class="mono">{{ "%.3f"|format(rpt[cls]['f1-score']) }}</td>
+          <td class="mono">{{ rpt[cls].support }}</td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      <tr>
+        <td><strong>Macro avg</strong></td>
+        <td class="mono">{{ "%.3f"|format(rpt['macro avg'].precision) }}</td>
+        <td class="mono">{{ "%.3f"|format(rpt['macro avg'].recall) }}</td>
+        <td class="mono">{{ "%.3f"|format(rpt['macro avg']['f1-score']) }}</td>
+        <td class="mono">{{ rpt['macro avg'].support }}</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+{% else %}
+
+<div class="panel">
+  <div class="empty-state">
+    No training report found. Run <code>python -m src.ml.train</code> first.
+  </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

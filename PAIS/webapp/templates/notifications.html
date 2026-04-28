@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Notifications — {{ app_name }}{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">Alert Log</div>
+    <h1 class="page-title">Notifications</h1>
+    <p class="page-subtitle">
+      Every alert dispatched by the system — written to
+      <span class="mono">reports/notifications.jsonl</span>. In production this
+      log would feed an SMTP worker; here the ConsoleDispatcher / JsonlDispatcher
+      make it easy to audit.
+    </p>
+  </div>
+</header>
+
+{% if items %}
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title">Most recent · newest first</div>
+      <div class="panel-sub">Showing last 200 entries</div>
+    </div>
+    <span class="small muted">{{ items|length }} entries</span>
+  </div>
+  <table class="datatable">
+    <thead>
+      <tr><th>When</th><th>Recipient</th><th>Student</th><th>Band</th><th>Subject</th></tr>
+    </thead>
+    <tbody>
+      {% for n in items %}
+      <tr>
+        <td class="mono muted small">{{ n.created_at[:19] }}Z</td>
+        <td>
+          <span class="badge {{ 'badge-HIGH' if n.recipient == 'parent' else 'badge-LOW' }}">{{ n.recipient }}</span>
+          <div class="small muted mono">{{ n.to_email }}</div>
+        </td>
+        <td><a href="{{ url_for('student_detail', student_id=n.student_id) }}" class="mono">{{ n.student_id }}</a></td>
+        <td><span class="badge badge-{{ n.risk_band }}">{{ n.risk_band }}</span></td>
+        <td>{{ n.subject }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel">
+  <div class="empty-state">
+    <div style="font-family: var(--font-display); font-size: 20px; margin-bottom: 8px;">No notifications yet</div>
+    <div class="muted">Open a student profile and click <strong>Notify</strong> to dispatch an alert.</div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

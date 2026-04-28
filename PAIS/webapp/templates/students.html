@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Students — {{ app_name }}{% endblock %}
+{% block content %}
+
+<header class="page-head">
+  <div>
+    <div class="page-eyebrow">Roster</div>
+    <h1 class="page-title">Students</h1>
+    <p class="page-subtitle">
+      Every student, scored and ranked. Filter by risk band or department,
+      search by name or ID. Click any row for the full profile.
+    </p>
+  </div>
+</header>
+
+<div class="panel">
+  <div class="filter-bar">
+    <input type="text" id="q" class="input" placeholder="Search name or ID…">
+    <select id="band" class="select">
+      <option value="">All bands</option>
+      <option value="CRITICAL">Critical</option>
+      <option value="HIGH">High</option>
+      <option value="MODERATE">Moderate</option>
+      <option value="LOW">Low</option>
+      <option value="SAFE">Safe</option>
+    </select>
+    <select id="department" class="select">
+      <option value="">All departments</option>
+      <option value="CS">CS</option>
+      <option value="Engineering">Engineering</option>
+      <option value="Mathematics">Mathematics</option>
+      <option value="Business">Business</option>
+    </select>
+    <div style="margin-left: auto;" class="small muted" id="count">Loading…</div>
+  </div>
+
+  <table class="datatable">
+    <thead>
+      <tr>
+        <th>Student</th><th>Department</th>
+        <th>Attendance</th><th>Midterm</th>
+        <th>Grade</th><th>Risk</th><th>Band</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="7" class="empty-state">Loading students…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const qEl = document.getElementById('q');
+const bandEl = document.getElementById('band');
+const deptEl = document.getElementById('department');
+const tbody = document.getElementById('tbody');
+const countEl = document.getElementById('count');
+
+let timer = null;
+
+async function load() {
+  const params = new URLSearchParams({
+    q: qEl.value, band: bandEl.value, department: deptEl.value, limit: 300
+  });
+  const data = await getJSON('/api/students?' + params);
+  countEl.textContent = `${data.rows.length.toLocaleString()} of ${data.total.toLocaleString()} students`;
+
+  if (data.rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No students match those filters.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.rows.map(r => `
+    <tr>
+      <td>
+        <a href="/students/${r.student_id}">${r.name}</a>
+        <div class="mono muted small">${r.student_id}</div>
+      </td>
+      <td>${r.department}</td>
+      <td class="mono">${r.attendance}%</td>
+      <td class="mono">${r.midterm}</td>
+      <td><span class="grade-badge grade-${r.grade}">${r.grade}</span></td>
+      <td class="mono">${r.risk_score.toFixed(3)}</td>
+      <td><span class="badge badge-${r.risk_band}">${r.risk_band}</span></td>
+    </tr>
+  `).join('');
+}
+
+function debounce() { clearTimeout(timer); timer = setTimeout(load, 200); }
+qEl.addEventListener('input', debounce);
+bandEl.addEventListener('change', load);
+deptEl.addEventListener('change', load);
+load();
+</script>
+{% endblock %}

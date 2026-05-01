@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Hash Map Lookup · {{ app_name }}{% endblock %}
+
+{% block content %}
+<header class="algo-page-head">
+  <h1 class="algo-page-title">Hash Map Lookup</h1>
+  <div class="algo-page-sub">DSA Module 3 · O(1) average-case student lookup</div>
+</header>
+
+<div class="algo-intro hash">
+  <span class="algo-tag hash">O(1) AVERAGE LOOKUP</span>
+  <div class="algo-name">🔑 Hash Map — Fast Student Lookup</div>
+  <p class="algo-desc">
+    Every student record is stored in a Hash Map keyed by Student_ID.
+    This enables O(1) average-case lookups across all {{ "{:,}".format(n_keys) }} records —
+    critical for real-time ingestion of new portal marks and building the
+    risk score on each update without re-scanning the full dataset.
+  </p>
+  <div class="complexity-row">
+    <div class="complexity-cell">
+      <div class="complexity-label">LOOKUP</div>
+      <div class="complexity-value">O(1) avg</div>
+    </div>
+    <div class="complexity-cell">
+      <div class="complexity-label">INSERT</div>
+      <div class="complexity-value">O(1) avg</div>
+    </div>
+    <div class="complexity-cell">
+      <div class="complexity-label">DELETE</div>
+      <div class="complexity-value">O(1) avg</div>
+    </div>
+    <div class="complexity-cell">
+      <div class="complexity-label">SPACE</div>
+      <div class="complexity-value">O(n)</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="hash-search">
+    <div class="panel-title" style="margin-bottom: 6px;">🔍 Live Student Lookup (O(1))</div>
+    <div class="panel-sub" style="margin-bottom: 16px;">Type a Student ID like <span class="mono">S1042</span></div>
+    <input class="hash-search-input" type="text" placeholder="Enter Student ID (e.g. S1042)…" id="hashInput" autocomplete="off">
+    <div class="hash-result" id="hashResult"></div>
+  </div>
+
+  <div>
+    <div class="hash-stats-grid">
+      <div class="hash-stat-card">
+        <div class="hash-stat-value">{{ "{:,}".format(n_keys) }}</div>
+        <div class="hash-stat-label">KEYS STORED</div>
+      </div>
+      <div class="hash-stat-card">
+        <div class="hash-stat-value green">O(1)</div>
+        <div class="hash-stat-label">AVG LOOKUP TIME</div>
+      </div>
+      <div class="hash-stat-card">
+        <div class="hash-stat-value green">0</div>
+        <div class="hash-stat-label">COLLISIONS (UNIQUE IDs)</div>
+      </div>
+      <div class="hash-stat-card">
+        <div class="hash-stat-value amber">{{ n_fields }}</div>
+        <div class="hash-stat-label">FIELDS PER RECORD</div>
+      </div>
+    </div>
+    <div class="hash-foot-note" style="margin-top: 14px; padding-top: 0; border: none; padding: 0 10px;">
+      The hash map aggregates data from: attendance logs, portal marks, assignment
+      downloads, quiz scores, and participation entries — all indexed by the same
+      <code>Student_ID</code> key for instant cross-source joins.
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('hashInput');
+  const out = document.getElementById('hashResult');
+  let timer = null;
+
+  async function lookup(q) {
+    if (!q) { out.classList.remove('shown'); return; }
+    try {
+      const res = await fetch('/api/student-lookup/' + encodeURIComponent(q.toUpperCase()));
+      const data = await res.json();
+      if (!data.found) {
+        out.innerHTML = '<div style="color: var(--ink-muted); font-size: 13px;">No match for ' + q + '</div>';
+        out.classList.add('shown');
+        return;
+      }
+      out.innerHTML =
+        '<div class="hash-result-row"><span class="hash-result-label">Student_ID</span>'
+        + '<span class="hash-result-value">' + data.sid + '</span></div>'
+        + '<div class="hash-result-row"><span class="hash-result-label">Name</span>'
+        + '<span class="hash-result-value">' + data.name + '</span></div>'
+        + '<div class="hash-result-row"><span class="hash-result-label">Department</span>'
+        + '<span class="hash-result-value">' + data.department + '</span></div>'
+        + '<div class="hash-result-row"><span class="hash-result-label">Risk score</span>'
+        + '<span class="hash-result-value">' + data.risk_score + ' · ' + data.risk_band + '</span></div>'
+        + '<div class="hash-result-row"><span class="hash-result-label">Attendance / Midterm</span>'
+        + '<span class="hash-result-value">' + data.attendance + '% · ' + data.midterm + '</span></div>';
+      out.classList.add('shown');
+    } catch (e) {
+      out.innerHTML = '<div style="color: var(--risk-critical); font-size: 13px;">Lookup failed</div>';
+      out.classList.add('shown');
+    }
+  }
+
+  input.addEventListener('input', (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => lookup(e.target.value.trim()), 150);
+  });
+});
+</script>
+{% endblock %}

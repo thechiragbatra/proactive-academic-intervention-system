@@ -1,4 +1,3 @@
-"""DSA modules used by the PAIS pipeline."""
 from .priority_queue import RiskHeap
 from .sliding_window import detect_attendance_anomalies
 from .hash_aggregator import StudentHashIndex

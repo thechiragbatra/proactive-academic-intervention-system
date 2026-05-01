@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Priority Queue · {{ app_name }}{% endblock %}
+
+{% block content %}
+<header class="algo-page-head">
+  <h1 class="algo-page-title">Priority Queue (Max-Heap)</h1>
+  <div class="algo-page-sub">DSA Module 1 · O(1) top-k retrieval</div>
+</header>
+
+<div class="grid-2" style="margin-bottom: 22px;">
+  <div class="algo-intro heap">
+    <span class="algo-tag heap">O(1) PEEK · O(log n) INSERT</span>
+    <div class="algo-name">▲ Max-Heap Priority Queue</div>
+    <p class="algo-desc">
+      Students are stored in a Max-Heap indexed by their computed Risk Score.
+      This guarantees that the most critical student is always at the root —
+      faculty can retrieve the top-k at-risk students in O(1) time without
+      sorting the entire dataset.
+    </p>
+    <div class="complexity-row">
+      <div class="complexity-cell">
+        <div class="complexity-label">PEEK TOP</div>
+        <div class="complexity-value">O(1)</div>
+      </div>
+      <div class="complexity-cell">
+        <div class="complexity-label">INSERT</div>
+        <div class="complexity-value">O(log n)</div>
+      </div>
+      <div class="complexity-cell">
+        <div class="complexity-label">EXTRACT MAX</div>
+        <div class="complexity-value">O(log n)</div>
+      </div>
+      <div class="complexity-cell">
+        <div class="complexity-label">BUILD HEAP</div>
+        <div class="complexity-value">O(n)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="heap-vis">
+    <div class="panel-title" style="margin-bottom: 8px;">Live Heap Visualization (Top 7 nodes)</div>
+    <div class="heap-tree">
+      <div class="heap-row">
+        {% if top7|length >= 1 %}
+        <div class="heap-node">
+          <div class="heap-node-score">{{ "%.0f"|format((top7[0][1] or 0) * 100) }}</div>
+          <div class="heap-node-id">{{ top7[0][0] }}</div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="heap-row" style="justify-content: space-around; padding: 0 80px;">
+        {% for i in [1, 2] %}
+          {% if top7|length > i %}
+          <div class="heap-node">
+            <div class="heap-node-score">{{ "%.0f"|format((top7[i][1] or 0) * 100) }}</div>
+            <div class="heap-node-id">{{ top7[i][0] }}</div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="heap-row">
+        {% for i in [3, 4, 5, 6] %}
+          {% if top7|length > i %}
+          <div class="heap-node">
+            <div class="heap-node-score">{{ "%.0f"|format((top7[i][1] or 0) * 100) }}</div>
+            <div class="heap-node-id">{{ top7[i][0] }}</div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <div class="heap-caption">Root = highest risk student</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title">▲ Top 10 Students by Risk Score (Heap Root → Leaves)</div>
+      <div class="panel-sub">Root = highest risk, guaranteed O(1) access</div>
+    </div>
+  </div>
+
+  <div class="heap-list">
+    {% for sid, score, meta in top10 %}
+    <div class="heap-row-item">
+      <div class="heap-rank {% if loop.index > 5 %}warm{% endif %}">{{ loop.index }}</div>
+      <div class="heap-info">
+        <div class="heap-info-name">{{ meta.name }}</div>
+        <div class="heap-info-meta">{{ sid }} · {{ meta.department }}</div>
+      </div>
+      <div style="text-align: right;">
+        <div class="heap-score-pill">{{ "%.0f"|format((score or 0) * 100) }}</div>
+        <div class="heap-foot">Att: {{ "%.1f"|format(meta.get('attendance', 0) or 0) }}% · Total: {{ "%.0f"|format(meta.get('total_score', 0) or 0) }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,14 +1,3 @@
-"""
-Business logic — personalised recommendation text generator.
-
-Produces human-readable, actionable advice for a student based on:
-1. Which of their academic dimensions are weakest (attendance / midterm /
-   assignments / quizzes / participation / projects).
-2. The greedy grade optimizer's minimum-marks roadmap.
-3. Their behavioural signals (stress, sleep, study hours).
-
-Kept text-first (not ML-generated) so mentors can audit and edit easily.
-"""
 from __future__ import annotations
 from dataclasses import dataclass
 
@@ -16,9 +5,6 @@ from ..oop.student_record import StudentRecord
 from ..dsa.grade_optimizer import GradeOptimizer
 
 
-# ---------------------------------------------------------------------------
-# Rule snippets — one per diagnosable condition.
-# ---------------------------------------------------------------------------
 TIPS = {
     "attendance_low": (
         "• Your attendance is below 75%. Book a meeting with your mentor "
@@ -63,9 +49,6 @@ TIPS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Builder
-# ---------------------------------------------------------------------------
 def _diagnose(r: StudentRecord) -> list[str]:
     tips: list[str] = []
     if r.attendance is not None:
@@ -95,13 +78,10 @@ def _diagnose(r: StudentRecord) -> list[str]:
 
 def build_recommendation_text(r: StudentRecord,
                               optimizer: GradeOptimizer | None = None) -> str:
-    """
-    Compose the full personalised recommendation for a student.
-    """
     optimizer = optimizer or GradeOptimizer()
     diagnostics = _diagnose(r)
 
-    # Greedy roadmap — show the top 3 feasible grades.
+
     roadmap = optimizer.full_roadmap(
         midterm=r.midterm or 0,
         assignments=r.assignments_avg or 0,

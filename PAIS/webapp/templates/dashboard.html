@@ -155,7 +155,7 @@
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { grid: { color: '#efebe0' }, ticks: { precision: 0 } },
+        y: { grid: { color: '#232a36' }, ticks: { color: '#b3b8c0' }, ticks: { precision: 0 } },
         x: { grid: { display: false } },
       },
     },
@@ -170,7 +170,7 @@
       labels: labels,
       datasets: [{
         data: labels.map(l => deptAvg[l]),
-        backgroundColor: '#1e3a5f',
+        backgroundColor: '#3b82f6',
         borderRadius: 4,
         barThickness: 40,
       }],
@@ -183,7 +183,7 @@
         tooltip: { callbacks: { afterBody: (ctx) => `n = ${deptCt[ctx[0].label]}` } },
       },
       scales: {
-        x: { min: 0, max: 1, grid: { color: '#efebe0' } },
+        x: { min: 0, max: 1, grid: { color: '#232a36' }, ticks: { color: '#b3b8c0' } },
         y: { grid: { display: false } },
       },
     },

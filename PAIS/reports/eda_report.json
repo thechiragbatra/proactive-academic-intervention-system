@@ -1,0 +1,89 @@
+{
+  "rows": 5000,
+  "columns": 24,
+  "class_balance": {
+    "safe": 2961,
+    "at_risk": 2039,
+    "at_risk_rate": 0.4078
+  },
+  "missingness": {
+    "columns_with_nulls": 1,
+    "max_missing_pct": 20.5
+  },
+  "numeric_distributions": {
+    "plotted_columns": 10
+  },
+  "correlation": {
+    "top_correlated_with_target": {
+      "Projects_Score": -0.473,
+      "Assignments_Avg": -0.265,
+      "Midterm_Score": -0.251,
+      "Quizzes_Avg": -0.156,
+      "Participation_Score": -0.15,
+      "Stress_Level (1-10)": -0.021,
+      "Sleep_Hours_per_Night": -0.011,
+      "Attendance (%)": 0.009
+    }
+  },
+  "categorical": {
+    "Gender": {
+      "Female": 0.409,
+      "Male": 0.407
+    },
+    "Department": {
+      "Engineering": 0.417,
+      "Mathematics": 0.414,
+      "CS": 0.412,
+      "Business": 0.388
+    },
+    "Extracurricular_Activities": {
+      "Yes": 0.413,
+      "No": 0.403
+    },
+    "Internet_Access_at_Home": {
+      "No": 0.412,
+      "Yes": 0.403
+    },
+    "Parent_Education_Level": {
+      "High School": 0.415,
+      "Master's": 0.414,
+      "PhD": 0.409,
+      "Bachelor's": 0.394
+    },
+    "Family_Income_Level": {
+      "Low": 0.41,
+      "Medium": 0.409,
+      "High": 0.405
+    }
+  },
+  "leakage_check": {
+    "Final_Score": {
+      "corr_with_target": -0.4813
+    },
+    "Total_Score": {
+      "corr_with_target": -0.8017
+    },
+    "Grade": {
+      "A": {
+        "0": 1.0,
+        "1": 0.0
+      },
+      "B": {
+        "0": 1.0,
+        "1": 0.0
+      },
+      "C": {
+        "0": 1.0,
+        "1": 0.0
+      },
+      "D": {
+        "0": 0.0,
+        "1": 1.0
+      },
+      "F": {
+        "0": 0.0,
+        "1": 1.0
+      }
+    }
+  }
+}

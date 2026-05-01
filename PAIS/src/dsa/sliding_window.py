@@ -1,26 +1,3 @@
-"""
-DSA #2 — Sliding Window for attendance-gap detection.
-
-Problem
--------
-Raw attendance % hides short-term collapses. A student at 85% overall can
-still have a dangerous 7-day blackout that predicts their disengagement.
-
-Approach
---------
-Slide a fixed window across each student's daily log and flag windows where
-attendance drops sharply or variance explodes.
-
-Signals per window:
-- `mean_attended`: 0-1, average attendance in the window.
-- `std_attended`:  standard deviation inside the window.
-- `gap_flag`:      True if mean drops below 0.5 OR (std/mean) > threshold.
-
-Complexity
-----------
-O(d) per student for a term of d days, because we maintain a running sum
-rather than recomputing per window.
-"""
 from __future__ import annotations
 import pandas as pd
 import numpy as np
@@ -42,7 +19,6 @@ class AnomalyWindow:
 def _detect_for_student(student_id: str, days: list[int],
                         attended: list[int],
                         window: int) -> list[AnomalyWindow]:
-    """Run a single pass with a running sum to keep O(d) behaviour."""
     if len(attended) < window:
         return []
 
@@ -80,14 +56,6 @@ def detect_attendance_anomalies(
     *,
     window: int = C.SLIDING_WINDOW_DAYS,
 ) -> pd.DataFrame:
-    """
-    Scan daily logs and flag sliding-window anomalies.
-
-    Returns
-    -------
-    DataFrame with one row per anomalous window, sorted by severity
-    (lowest mean attendance first).
-    """
     all_anomalies: list[AnomalyWindow] = []
     for sid, group in logs.sort_values(["Student_ID", "day"]).groupby("Student_ID"):
         all_anomalies.extend(_detect_for_student(
@@ -104,7 +72,7 @@ def detect_attendance_anomalies(
         ])
 
     out = pd.DataFrame([a.__dict__ for a in all_anomalies])
-    # Keep only the worst window per student for the dashboard view.
+
     worst = out.sort_values("mean_attended").drop_duplicates("student_id")
     worst = worst.rename(columns={"student_id": "Student_ID"})
     return worst.reset_index(drop=True)

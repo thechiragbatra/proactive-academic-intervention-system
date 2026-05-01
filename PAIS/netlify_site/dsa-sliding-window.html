@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sliding Window — PAIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="global-header">
+      <div class="search-shell">
+        <svg viewBox="0 0 24 24" class="search-icon"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 001.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 00-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 005.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" placeholder="Search student ID or name…" id="globalSearch" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="sendAlertsBtn" type="button">📧 Send Alerts</button>
+    </div>
+
+    <header class="algo-page-head">
+      <h1 class="algo-page-title">Sliding Window Algorithm</h1>
+      <div class="algo-page-sub">DSA Module 2 · 7-day attendance variance detection</div>
+    </header>
+
+    <div class="algo-intro window">
+      <span class="algo-tag window">7-DAY ROLLING WINDOW</span>
+      <div class="algo-name">📅 Sliding Window Attendance Detection</div>
+      <p class="algo-desc">
+        Rather than comparing total semester attendance, PAIS uses a 7-day sliding
+        window to detect sudden "vanishing" patterns. A student maintaining 80%
+        overall can still trigger an early warning if their last 7 days show 0–2
+        attendances — catching the problem weeks before the total percentage
+        drops below 75%.
+      </p>
+      <div class="complexity-row">
+        <div class="complexity-cell"><div class="complexity-label">WINDOW SIZE</div><div class="complexity-value">7 days</div></div>
+        <div class="complexity-cell"><div class="complexity-label">SLIDE</div><div class="complexity-value">O(1)</div></div>
+        <div class="complexity-cell"><div class="complexity-label">FULL SCAN</div><div class="complexity-value">O(n)</div></div>
+        <div class="complexity-cell"><div class="complexity-label">SPACE</div><div class="complexity-value">O(k)</div></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="window-stream">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+          <div class="panel-title">📊 Simulated Attendance Stream (30 days)</div>
+          <button class="btn" id="randomizeBtn" type="button">↻ Randomize</button>
+        </div>
+        <div class="stream-bars" id="streamBars"></div>
+        <div class="stream-labels" id="streamLabels"></div>
+        <div style="font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted); margin-top: 10px;">
+          <span style="color: var(--ink-soft);">Semester attendance:</span>
+          <span id="semPct" style="color: var(--ink); font-weight: 500;">—</span>&nbsp;&nbsp;
+          <span style="color: var(--ink-soft);">Window (D19–D25):</span>
+          <span id="winPct" style="color: var(--risk-critical); font-weight: 500;">—</span>
+        </div>
+        <div id="warningBox" style="margin-top: 10px; padding: 10px 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; display: none;">
+          <div style="color: var(--risk-critical); font-weight: 600; font-size: 13px; margin-bottom: 4px;">🚨 EARLY WARNING TRIGGERED — Sudden attendance gap detected</div>
+          <div style="color: var(--ink-soft); font-size: 12px;">
+            Even with <span id="overallTxt">—</span>% overall attendance, the 7-day window reveals
+            a critical pattern that would be missed by total-percentage monitoring.
+          </div>
+        </div>
+        <div class="stream-legend">
+          <div><span class="legend-dot" style="background: var(--accent);"></span>Current 7-day window</div>
+          <div><span class="legend-dot" style="background: var(--hue-window);"></span>Present</div>
+          <div><span class="legend-dot" style="background: var(--risk-critical);"></span>Absent in window</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">⚠️ Students with Attendance Gaps</div>
+            <div class="panel-sub">Window variance &gt; threshold</div>
+          </div>
+          <div class="small mono muted">4890 flagged</div>
+        </div>
+        <div class="flagged-list">
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Emma Williams</div>
+            <div class="flagged-info-meta">S3507 · Semester: 51.9%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Liam Johnson</div>
+            <div class="flagged-info-meta">S3734 · Semester: 62.3%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Ali Davis</div>
+            <div class="flagged-info-meta">S2999 · Semester: 53.6%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Sara Jones</div>
+            <div class="flagged-info-meta">S1958 · Semester: 85.8%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Maria Jones</div>
+            <div class="flagged-info-meta">S3508 · Semester: 86.0%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Maria Smith</div>
+            <div class="flagged-info-meta">S4614 · Semester: 60.0%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Omar Smith</div>
+            <div class="flagged-info-meta">S3742 · Semester: 74.1%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">John Jones</div>
+            <div class="flagged-info-meta">S5284 · Semester: 78.9%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Ahmed Smith</div>
+            <div class="flagged-info-meta">S4474 · Semester: 54.9%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div>
+        <div class="flagged-item">
+          <div>
+            <div class="flagged-info-name">Ahmed Johnson</div>
+            <div class="flagged-info-meta">S2533 · Semester: 59.0%</div>
+          </div>
+          <div class="flagged-pct">
+            <div class="num bad">Window: 0%</div>
+            <div class="label">🚨 FLAGGED</div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="assets/js/shared.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof renderSidebar === 'function') renderSidebar('sidebar');
+  const search = document.getElementById('globalSearch');
+  if (search) search.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const q = search.value.trim();
+      if (q && /^S\d+/i.test(q)) window.location.href = 'student.html?id=' + q.toUpperCase();
+      else if (q) window.location.href = 'students.html?q=' + encodeURIComponent(q);
+    }
+  });
+  const btn = document.getElementById('sendAlertsBtn');
+  if (btn) btn.addEventListener('click', () => window.location.href = 'notifications.html');
+});
+</script>
+<script>
+function randomStream() {
+  const arr = [];
+  for (let i = 0; i < 30; i++) {
+    if (i >= 18 && i < 25) arr.push(Math.random() < 0.18 ? 1 : 0);
+    else                   arr.push(Math.random() < 0.85 ? 1 : 0);
+  }
+  return arr;
+}
+function render(arr) {
+  const bars = document.getElementById('streamBars');
+  const labels = document.getElementById('streamLabels');
+  bars.innerHTML = ''; labels.innerHTML = '';
+  arr.forEach((v, i) => {
+    const inWindow = (i >= 18 && i < 25);
+    const div = document.createElement('div');
+    div.className = 'stream-bar';
+    if (inWindow && v === 0) div.classList.add('window-absent');
+    else if (inWindow && v === 1) div.classList.add('window-present');
+    else if (v === 1) div.classList.add('present');
+    else div.classList.add('absent');
+    bars.appendChild(div);
+    const lbl = document.createElement('span'); lbl.textContent = 'D' + (i+1); labels.appendChild(lbl);
+  });
+  const overall = Math.round(arr.reduce((a,b)=>a+b,0) / arr.length * 100);
+  const winSum = arr.slice(18,25).reduce((a,b)=>a+b,0);
+  const winPct = Math.round(winSum/7 * 100);
+  document.getElementById('semPct').textContent = overall + '%';
+  document.getElementById('winPct').textContent = winPct + '%';
+  document.getElementById('overallTxt').textContent = overall;
+  document.getElementById('warningBox').style.display = winPct < 35 ? 'block' : 'none';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  render(randomStream());
+  document.getElementById('randomizeBtn').addEventListener('click', () => render(randomStream()));
+});
+</script>
+</body>
+</html>

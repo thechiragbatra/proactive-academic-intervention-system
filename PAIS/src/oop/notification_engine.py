@@ -1,25 +1,3 @@
-"""
-OOP — NotificationEngine.
-
-Responsibilities
-----------------
-- Decide WHO gets an alert (risk band + audit trigger logic).
-- Decide WHAT the message says (templated per risk band + recommendation).
-- Decide HOW to deliver it (console / JSON / SMTP).
-
-The synopsis calls for SMTP support. We ship a `SMTPDispatcher` that is
-opt-in and requires explicit credentials — by default, everything goes to
-the `ConsoleDispatcher`, which is safe for demos and viva.
-
-Inheritance
------------
-    Notification  ← base dataclass
-    StudentNotification    (inherits)
-    ParentNotification     (inherits)
-
-The dispatchers share a common abstract interface `Dispatcher`, and
-concrete implementations override `send()`.
-"""
 from __future__ import annotations
 import json
 import smtplib
@@ -34,9 +12,6 @@ from .. import config as C
 from .student_record import StudentRecord
 
 
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
 @dataclass
 class Notification:
     student_id: str
@@ -44,34 +19,28 @@ class Notification:
     subject: str
     body: str
     risk_band: str
-    recipient: str = "student"          # "student" | "parent"
+    recipient: str = "student"
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_dict(self) -> dict: return asdict(self)
 
 
 def StudentNotification(**kwargs) -> Notification:
-    """Factory — builds a Notification with recipient='student'."""
     kwargs.setdefault("recipient", "student")
     return Notification(**kwargs)
 
 
 def ParentNotification(**kwargs) -> Notification:
-    """Factory — builds a Notification with recipient='parent'."""
     kwargs["recipient"] = "parent"
     return Notification(**kwargs)
 
 
-# ---------------------------------------------------------------------------
-# Dispatchers
-# ---------------------------------------------------------------------------
 class Dispatcher(ABC):
     @abstractmethod
     def send(self, n: Notification) -> None: ...
 
 
 class ConsoleDispatcher(Dispatcher):
-    """Prints notifications — default for demos and tests."""
     def send(self, n: Notification) -> None:
         print(f"[{n.created_at}] → {n.recipient.upper()} <{n.to_email}>")
         print(f"  Subject: {n.subject}")
@@ -79,7 +48,6 @@ class ConsoleDispatcher(Dispatcher):
 
 
 class JsonlDispatcher(Dispatcher):
-    """Appends notifications to a JSON-lines file — useful for audit logs."""
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,11 +58,6 @@ class JsonlDispatcher(Dispatcher):
 
 
 class SMTPDispatcher(Dispatcher):
-    """
-    Sends over SMTP. DISABLED by default — callers must construct explicitly
-    with host/port/user/password. Included to satisfy the synopsis's
-    "SMTP Library" requirement.
-    """
     def __init__(self, *, host: str, port: int,
                  username: str, password: str, from_addr: str) -> None:
         self.host, self.port = host, port
@@ -112,11 +75,7 @@ class SMTPDispatcher(Dispatcher):
             s.send_message(msg)
 
 
-# ---------------------------------------------------------------------------
-# Engine
-# ---------------------------------------------------------------------------
 class NotificationEngine:
-    """Decides and dispatches alerts for a set of students."""
 
     SUBJECT_BY_BAND = {
         "CRITICAL": "URGENT: Immediate Academic Review Required",
@@ -128,16 +87,10 @@ class NotificationEngine:
         self.dispatcher = dispatcher or ConsoleDispatcher()
         self.sent_log: list[Notification] = []
 
-    # ------------------------------------------------------------------
-    # Decision layer
-    # ------------------------------------------------------------------
+
     @staticmethod
     def should_notify(record: StudentRecord,
                       marks_reflected_pct: float = 0.0) -> bool:
-        """
-        Synopsis "50-mark audit": once ≥50% of marks are in, we notify
-        every student whose risk band is MODERATE or worse.
-        """
         if record.risk_band in {"CRITICAL", "HIGH"}:
             return True
         if (record.risk_band == "MODERATE"
@@ -145,9 +98,7 @@ class NotificationEngine:
             return True
         return False
 
-    # ------------------------------------------------------------------
-    # Message construction
-    # ------------------------------------------------------------------
+
     def _build_student_message(self, r: StudentRecord,
                                recommendation_text: str) -> Notification:
         subject = self.SUBJECT_BY_BAND.get(r.risk_band, "Academic Check-in")
@@ -172,7 +123,7 @@ class NotificationEngine:
         )
 
     def _build_parent_message(self, r: StudentRecord) -> Notification:
-        # We don't store guardian email; use a deterministic placeholder.
+
         parent_email = f"parent_of_{r.student_id.lower()}@university.com"
         subject = f"Academic Status Update for {r.full_name}"
         body = (
@@ -193,9 +144,7 @@ class NotificationEngine:
             subject=subject, body=body, risk_band=r.risk_band,
         )
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+
     def notify_student(self, r: StudentRecord, recommendation_text: str) -> None:
         n = self._build_student_message(r, recommendation_text)
         self.dispatcher.send(n)
@@ -210,10 +159,6 @@ class NotificationEngine:
                      recommendations: dict[str, str],
                      *, notify_parents_for: set[str] | None = None,
                      marks_reflected_pct: float = 0.0) -> None:
-        """
-        Iterate a cohort, firing student notifications (and parent
-        notifications for the bands in `notify_parents_for`).
-        """
         notify_parents_for = notify_parents_for or {"CRITICAL"}
         for r in cohort:
             if not self.should_notify(r, marks_reflected_pct):

@@ -3,26 +3,40 @@
    ========================================================================= */
 
 :root {
-  --bg:            #faf8f3;
-  --bg-panel:      #ffffff;
-  --bg-subtle:     #f2efe7;
-  --bg-sidebar:    #1a1d23;
+  /* DARK THEME — matches the dashboard reference.
+     Background is a deep navy-black, panels a slightly lifted dark navy
+     with hairline borders. Text is light. Accents stay vivid for clarity.
+  */
+  --bg:            #0f1419;
+  --bg-panel:      #161c24;
+  --bg-subtle:     #1c2330;
+  --bg-elevated:   #20283a;
+  --bg-sidebar:    #0a0e13;
 
-  --ink:           #1a1d23;
-  --ink-soft:      #4b5057;
-  --ink-muted:     #8a8f95;
-  --ink-faint:     #bfc2c6;
-  --line:          #e5e1d6;
-  --line-strong:   #d4cfc1;
+  --ink:           #e6e8eb;
+  --ink-soft:      #b3b8c0;
+  --ink-muted:     #6e7681;
+  --ink-faint:     #4a505a;
+  --line:          #232a36;
+  --line-strong:   #2d3544;
 
-  --risk-critical: #8b1e1e;
-  --risk-high:     #b25000;
-  --risk-moderate: #8b6f00;
-  --risk-low:      #4a6b3d;
-  --risk-safe:     #2d5a3d;
+  /* Risk colours — vivid on dark */
+  --risk-critical: #ef4444;
+  --risk-high:     #f59e0b;
+  --risk-moderate: #eab308;
+  --risk-low:      #84cc16;
+  --risk-safe:     #22c55e;
 
-  --accent:        #1e3a5f;
-  --accent-soft:   #e8edf3;
+  /* Accent — bright blue for live data, complexity badges, links */
+  --accent:        #3b82f6;
+  --accent-soft:   #1e3a5f;
+  --accent-bright: #60a5fa;
+
+  /* Module-specific accent colours used in DSA pages */
+  --hue-heap:      #ef4444;
+  --hue-window:    #22c55e;
+  --hue-hash:      #eab308;
+  --hue-grade:     #a855f7;
 
   --font-display:  'Fraunces', Georgia, serif;
   --font-body:     'IBM Plex Sans', -apple-system, sans-serif;
@@ -31,7 +45,7 @@
   --sidebar-w:     240px;
   --radius:        6px;
   --radius-lg:     10px;
-  --shadow-sm:     0 1px 2px rgba(26,29,35,0.04);
+  --shadow-sm:     0 1px 2px rgba(0,0,0,0.3);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -60,7 +74,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 /* Sidebar */
 .sidebar {
   background: var(--bg-sidebar);
-  color: #cdd2d8;
+  color: #b3b8c0;
   padding: 28px 18px 22px;
   position: fixed;
   top: 0; left: 0;
@@ -68,24 +82,25 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   height: 100vh;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #2a2e36;
+  border-right: 1px solid #1a1f28;
 }
 .brand {
   display: flex; align-items: center; gap: 12px;
   padding: 0 6px 24px;
-  border-bottom: 1px solid #2a2e36;
+  border-bottom: 1px solid #1a1f28;
   margin-bottom: 18px;
 }
 .brand-mark {
   width: 36px; height: 36px;
-  background: #faf8f3; color: #1a1d23;
+  background: var(--bg-elevated); color: var(--ink);
   font-family: var(--font-display); font-weight: 700; font-size: 20px;
   display: flex; align-items: center; justify-content: center;
   border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
 }
 .brand-name {
   font-family: var(--font-display); font-weight: 600; font-size: 18px;
-  color: #faf8f3; letter-spacing: -0.01em;
+  color: var(--ink); letter-spacing: -0.01em;
 }
 .brand-sub {
   font-size: 11px; color: #8a8f95;
@@ -103,8 +118,8 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   border-radius: var(--radius);
   transition: background 0.12s, color 0.12s;
 }
-.nav-link:hover { background: #23272f; color: #fff; text-decoration: none; }
-.nav-link.active { background: #faf8f3; color: #1a1d23; }
+.nav-link:hover { background: #1a1f28; color: var(--ink); text-decoration: none; }
+.nav-link.active { background: var(--accent-soft); color: var(--accent-bright); }
 .nav-icon { width: 17px; height: 17px; fill: currentColor; flex-shrink: 0; }
 
 .sidebar-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid #2a2e36; }
@@ -117,6 +132,43 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   padding: 36px 48px 64px;
   max-width: 1400px;
 }
+
+/* Global header — search input + Send Alerts button on every page */
+.global-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.search-shell {
+  position: relative;
+  width: 320px;
+}
+.search-icon {
+  position: absolute;
+  left: 12px; top: 50%;
+  width: 14px; height: 14px;
+  fill: var(--ink-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 9px 12px 9px 34px;
+  font-size: 13px; font-family: inherit;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+.search-input::placeholder { color: var(--ink-muted); }
+
 .page-head {
   border-bottom: 1px solid var(--line);
   padding-bottom: 22px; margin-bottom: 30px;
@@ -212,11 +264,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   letter-spacing: 0.08em; text-transform: uppercase;
   border-radius: 4px; font-family: var(--font-mono);
 }
-.badge-CRITICAL { background: #f5e4e4; color: var(--risk-critical); }
-.badge-HIGH     { background: #f7e7d8; color: var(--risk-high); }
-.badge-MODERATE { background: #f4eccc; color: var(--risk-moderate); }
-.badge-LOW      { background: #e4ecde; color: var(--risk-low); }
-.badge-SAFE     { background: #dde8e0; color: var(--risk-safe); }
+.badge-CRITICAL { background: rgba(239, 68, 68, 0.15); color: var(--risk-critical); border: 1px solid rgba(239, 68, 68, 0.3); }
+.badge-HIGH     { background: rgba(245, 158, 11, 0.15); color: var(--risk-high); border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-MODERATE { background: rgba(234, 179, 8, 0.15);  color: var(--risk-moderate); border: 1px solid rgba(234, 179, 8, 0.3); }
+.badge-LOW      { background: rgba(132, 204, 22, 0.15); color: var(--risk-low); border: 1px solid rgba(132, 204, 22, 0.3); }
+.badge-SAFE     { background: rgba(34, 197, 94, 0.15);  color: var(--risk-safe); border: 1px solid rgba(34, 197, 94, 0.3); }
 
 .grade-badge {
   display: inline-flex; align-items: center; justify-content: center;
@@ -224,11 +276,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   font-family: var(--font-display); font-weight: 600; font-size: 13px;
   border-radius: 4px; background: var(--bg-subtle);
 }
-.grade-F { background: #f5e4e4; color: var(--risk-critical); }
-.grade-D { background: #f7e7d8; color: var(--risk-high); }
-.grade-C { background: #f4eccc; color: var(--risk-moderate); }
-.grade-B { background: #e4ecde; color: var(--risk-low); }
-.grade-A { background: #dde8e0; color: var(--risk-safe); }
+.grade-F { background: rgba(239, 68, 68, 0.15); color: var(--risk-critical); }
+.grade-D { background: rgba(245, 158, 11, 0.15); color: var(--risk-high); }
+.grade-C { background: rgba(234, 179, 8, 0.15);  color: var(--risk-moderate); }
+.grade-B { background: rgba(132, 204, 22, 0.15); color: var(--risk-low); }
+.grade-A { background: rgba(34, 197, 94, 0.15);  color: var(--risk-safe); }
 
 /* Forms */
 .btn {
@@ -239,11 +291,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   background: var(--bg-panel); color: var(--ink);
   transition: all 0.12s;
 }
-.btn:hover { background: var(--bg-subtle); text-decoration: none; }
-.btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.btn-primary:hover { background: #000; color: var(--bg); }
+.btn:hover { background: var(--bg-subtle); border-color: var(--line-strong); text-decoration: none; }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-bright); color: #fff; border-color: var(--accent-bright); }
 .btn-danger { background: var(--risk-critical); color: #fff; border-color: var(--risk-critical); }
-.btn-danger:hover { background: #6b1616; color: #fff; }
+.btn-danger:hover { background: #b91c1c; color: #fff; }
 
 .input, .select {
   padding: 8px 12px; font-size: 13px; font-family: inherit;
@@ -272,9 +324,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   padding: 10px 16px; border-radius: var(--radius); font-size: 13px;
   border: 1px solid var(--line-strong);
 }
-.flash-error { background: #f5e4e4; color: var(--risk-critical); border-color: #e8c4c4; }
-.flash-success { background: #dde8e0; color: var(--risk-safe); border-color: #c5d6c8; }
-.flash-message { background: var(--accent-soft); color: var(--accent); }
+.flash-error { background: rgba(239, 68, 68, 0.12); color: var(--risk-critical); border-color: rgba(239, 68, 68, 0.4); }
+.flash-success { background: rgba(34, 197, 94, 0.12); color: var(--risk-safe); border-color: rgba(34, 197, 94, 0.4); }
+.flash-message { background: var(--accent-soft); color: var(--accent-bright); }
 
 /* Student detail */
 .hero {
@@ -453,7 +505,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 13px;
-  color: #faf8f3;
+  color: var(--ink);
   letter-spacing: 0.01em;
 }
 
@@ -461,3 +513,333 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .panel { transition: border-color 0.15s, transform 0.2s; }
 .panel:hover { border-color: var(--line-strong); }
 
+
+/* =========================================================================
+   DSA Page styles — used by Priority Queue, Sliding Window, Hash Map pages
+   ========================================================================= */
+.algo-page-head {
+  margin-bottom: 24px;
+}
+.algo-page-title {
+  font-family: var(--font-display);
+  font-size: 26px; font-weight: 600;
+  color: var(--ink); letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.algo-page-sub {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.algo-intro {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px;
+  margin-bottom: 22px;
+}
+.algo-intro.heap   { border-left-color: var(--hue-heap); }
+.algo-intro.window { border-left-color: var(--hue-window); }
+.algo-intro.hash   { border-left-color: var(--hue-hash); }
+
+.algo-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.06em;
+  padding: 4px 10px;
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  border-radius: 3px;
+  margin-bottom: 12px;
+}
+.algo-tag.heap   { background: rgba(239, 68, 68, 0.15); color: var(--hue-heap); }
+.algo-tag.window { background: rgba(34, 197, 94, 0.15); color: var(--hue-window); }
+.algo-tag.hash   { background: rgba(234, 179, 8, 0.15); color: var(--hue-hash); }
+
+.algo-name {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+.algo-desc {
+  font-size: 14px; line-height: 1.6;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+}
+
+.complexity-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.complexity-cell {
+  padding: 12px 16px;
+  border-right: 1px solid var(--line);
+}
+.complexity-cell:last-child { border-right: none; }
+.complexity-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.complexity-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--accent-bright);
+  font-weight: 500;
+}
+
+/* Heap visualisation — top 7 nodes laid out as a binary tree */
+.heap-vis {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 28px 22px 24px;
+  position: relative;
+}
+.heap-tree {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 28px;
+  margin-bottom: 14px;
+}
+.heap-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.heap-node {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border: 2px solid var(--hue-heap);
+  background: rgba(239, 68, 68, 0.08);
+  font-family: var(--font-mono);
+}
+.heap-node-score {
+  font-size: 16px; font-weight: 600;
+  color: var(--hue-heap);
+}
+.heap-node-id {
+  font-size: 9px;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+.heap-caption {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-top: 8px;
+}
+
+/* Heap top-10 student list */
+.heap-list .heap-row-item {
+  display: flex; align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.heap-list .heap-row-item:last-child { border-bottom: none; }
+.heap-rank {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  margin-right: 14px;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--hue-heap);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.heap-rank.warm { background: rgba(245, 158, 11, 0.15); color: var(--risk-high); border-color: rgba(245, 158, 11, 0.3); }
+.heap-info {
+  flex: 1;
+}
+.heap-info-name {
+  font-size: 14px; font-weight: 500; color: var(--ink);
+}
+.heap-info-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+.heap-score-pill {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--hue-heap);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  min-width: 44px; text-align: center;
+}
+.heap-foot {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-align: right;
+  margin-top: 2px;
+}
+
+/* Sliding-window — 30-day attendance bar stream */
+.window-stream {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px;
+}
+.stream-bars {
+  display: flex; gap: 4px;
+  height: 80px;
+  margin: 16px 0 8px;
+  align-items: end;
+}
+.stream-bar {
+  flex: 1;
+  height: 100%;
+  border-radius: 3px 3px 0 0;
+  position: relative;
+}
+.stream-bar.present { background: var(--hue-window); }
+.stream-bar.absent  { background: rgba(110, 118, 129, 0.4); }
+.stream-bar.window-absent { background: var(--risk-critical); }
+.stream-bar.window-present { background: var(--accent); }
+.stream-labels {
+  display: flex; gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-muted);
+  margin-bottom: 14px;
+}
+.stream-labels span { flex: 1; text-align: center; }
+.stream-legend {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.legend-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Hash Map — search input + stats grid */
+.hash-search {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px;
+}
+.hash-search-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 14px;
+  font-family: var(--font-mono);
+}
+.hash-search-input:focus {
+  outline: none;
+  border-color: var(--hue-hash);
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.15);
+}
+.hash-result {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  display: none;
+}
+.hash-result.shown { display: block; }
+.hash-result-row {
+  display: flex; justify-content: space-between;
+  padding: 6px 0; font-family: var(--font-mono); font-size: 12px;
+}
+.hash-result-row + .hash-result-row {
+  border-top: 1px dashed var(--line);
+}
+.hash-result-label { color: var(--ink-muted); }
+.hash-result-value { color: var(--ink); }
+
+.hash-stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; padding: 22px 26px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.hash-stat-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  text-align: center;
+}
+.hash-stat-value {
+  font-family: var(--font-mono);
+  font-size: 26px; font-weight: 500;
+  color: var(--accent-bright);
+  margin-bottom: 6px;
+}
+.hash-stat-value.amber { color: var(--hue-hash); }
+.hash-stat-value.green { color: var(--hue-window); }
+.hash-stat-label {
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.06em;
+}
+.hash-foot-note {
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px; line-height: 1.5;
+  color: var(--ink-soft);
+}
+.hash-foot-note code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent-bright);
+}
+
+/* Flagged students list (sliding-window page) */
+.flagged-list .flagged-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.flagged-list .flagged-item:last-child { border-bottom: none; }
+.flagged-info-name {
+  font-size: 14px; font-weight: 500; color: var(--ink);
+}
+.flagged-info-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+.flagged-pct {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.flagged-pct .num { font-weight: 500; }
+.flagged-pct .num.high { color: var(--hue-window); }
+.flagged-pct .num.warn { color: var(--risk-high); }
+.flagged-pct .num.bad  { color: var(--risk-critical); }
+.flagged-pct .label { font-size: 10px; color: var(--ink-muted); }

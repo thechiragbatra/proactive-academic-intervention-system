@@ -1,20 +1,10 @@
-"""
-ML evaluation utilities — loads the persisted model and produces figures.
 
-Generates:
-    reports/figures/confusion_matrix.png
-    reports/figures/feature_importance.png
-    reports/figures/roc_curve.png
-
-Run directly:
-    python -m src.ml.evaluate
-"""
 from __future__ import annotations
 import joblib
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use("Agg")          # headless-safe; must come before pyplot import
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
     confusion_matrix, roc_curve, roc_auc_score,
@@ -71,7 +61,7 @@ def plot_roc(y_true, y_proba, path):
 
 
 def plot_feature_importance(pipe, feature_names, path):
-    """Extract either tree importances or linear coefficients."""
+
     clf = pipe.named_steps["clf"]
     pre = pipe.named_steps["pre"]
     try:
@@ -84,7 +74,7 @@ def plot_feature_importance(pipe, feature_names, path):
     elif hasattr(clf, "coef_"):
         imp = np.abs(clf.coef_[0])
     else:
-        return   # unknown model
+        return
 
     idx = np.argsort(imp)[::-1][:15]
     fig, ax = plt.subplots(figsize=(7.5, 5))

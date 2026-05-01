@@ -346,6 +346,90 @@
         </div>
       </div>
     </div>
+
+    <!--  Bulk CSV mode — same algorithm, applied to every uploaded student  -->
+    <div style="margin-top: 36px;">
+      <div class="page-head" style="margin-bottom: 18px;">
+        <div>
+          <div class="page-eyebrow">Bulk mode</div>
+          <h2 class="page-title" style="font-size: 24px;">Upload a Cohort</h2>
+          <p class="page-subtitle">
+            Upload a CSV with the same column schema as the training data and we'll
+            run the same greedy roadmap algorithm on every student. Pass the file
+            below — preview shows roadmaps for the first 10 rows.
+          </p>
+        </div>
+      </div>
+
+      {% if not csv_results %}
+      <form method="POST" enctype="multipart/form-data"
+            action="{{ url_for('grade_calculator') }}" class="panel"
+            style="display: flex; align-items: center; gap: 16px;">
+        <input type="file" name="file" accept=".csv" required style="flex: 1;">
+        <button type="submit" class="btn btn-primary">Compute roadmaps →</button>
+      </form>
+      {% else %}
+      <section class="kpi-row" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="kpi">
+          <div class="kpi-label">Roadmaps generated</div>
+          <div class="kpi-value">{{ csv_results|length }}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Best achievable distribution</div>
+          <div class="mono small" style="margin-top: 8px; line-height: 1.7;">
+            {% for grade, count in best_grade_counts.items() %}
+              <span class="grade-badge grade-{{ grade[0] }}">{{ grade }}</span>
+              <span style="margin-left: 4px;">{{ count }}</span>
+              {% if not loop.last %}<span style="color: var(--ink-faint); margin: 0 4px;">·</span>{% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Action</div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <a href="{{ url_for('grade_calculator') }}" class="btn">Reset</a>
+          </div>
+        </div>
+      </section>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Per-student roadmaps · first 10 rows</div>
+            <div class="panel-sub">Shows minimum % required on remaining evaluations to hit each grade tier</div>
+          </div>
+        </div>
+        <table class="datatable datatable-compact">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Earned</th>
+              <th>Best grade</th>
+              <th>Need for A+</th>
+              <th>Need for A</th>
+              <th>Need for B+</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in csv_results[:10] %}
+            <tr>
+              <td>
+                {{ r.name }}
+                <div class="mono muted small">{{ r.sid }}</div>
+              </td>
+              <td class="mono">{{ "%.1f"|format(r.earned) }}</td>
+              <td><span class="grade-badge grade-{{ r.best[0] }}">{{ r.best }}</span></td>
+              <td class="mono">{% if r.aplus.feasible %}{{ "%.1f"|format(r.aplus.req) }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+              <td class="mono">{% if r.a.feasible %}{{ "%.1f"|format(r.a.req) }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+              <td class="mono">{% if r.bplus.feasible %}{{ "%.1f"|format(r.bplus.req) }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
 {% endblock %}
 
 {% block extra_js %}

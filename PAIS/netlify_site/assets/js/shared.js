@@ -13,39 +13,37 @@
    ============================================================================ */
 
 const RISK_COLORS = {
-  CRITICAL: '#8b1e1e', HIGH: '#b25000', MODERATE: '#8b6f00',
-  LOW: '#4a6b3d',      SAFE: '#2d5a3d',
+  CRITICAL: '#ef4444', HIGH: '#f59e0b', MODERATE: '#eab308',
+  LOW: '#84cc16',      SAFE: '#22c55e',
 };
 
-/* Navigation is split into 3 logical groups in the sidebar.
-   Each item has a `match` regex to detect when it's the active page. */
 const NAV_ITEMS = [
   { label: 'Dashboard',         href: 'index.html',           match: /(^\/?$|\/index\.html$)/ },
-  { label: 'Students',          href: 'students.html',        match: /\/(students|student|edit)\.html/ },
+  { label: 'At-Risk Students',  href: 'students.html',        match: /\/(students|student|edit)\.html/ },
+  { label: 'Priority Queue',    href: 'dsa-priority-queue.html',  match: /\/dsa-priority-queue\.html/ },
+  { label: 'Sliding Window',    href: 'dsa-sliding-window.html',  match: /\/dsa-sliding-window\.html/ },
+  { label: 'Hash Map Lookup',   href: 'dsa-hash-map.html',        match: /\/dsa-hash-map\.html/ },
+  { label: 'Grade Calculator',  href: 'grade-calculator.html',    match: /\/grade-calculator\.html/ },
+  { label: 'Notifications',     href: 'notifications.html',   match: /\/notifications\.html/ },
   { label: 'Analytics',         href: 'analytics.html',       match: /\/analytics\.html/ },
   { label: 'ML Model',          href: 'model.html',           match: /\/model\.html/ },
   { label: 'Score New Cohort',  href: 'upload.html',          match: /\/upload\.html/ },
-  { label: 'Notifications',     href: 'notifications.html',   match: /\/notifications\.html/ },
-  // DSA Engine group — new in this release
-  { label: 'Algorithm Visualizer', href: 'dsa-visualizer.html', match: /\/dsa-visualizer\.html/ },
-  { label: 'Grade Calculator',     href: 'grade-calculator.html', match: /\/grade-calculator\.html/ },
 ];
 
 function renderSidebar(containerId = 'sidebar') {
   const el = document.getElementById(containerId);
   if (!el) return;
   const path = window.location.pathname;
-  // Three groups: Overview (analytics), System (model + ops), DSA Engine (new)
   const groups = [
-    { name: 'Overview',   items: ['Dashboard', 'Students', 'Analytics'] },
-    { name: 'System',     items: ['ML Model', 'Score New Cohort', 'Notifications'] },
-    { name: 'DSA Engine', items: ['Algorithm Visualizer', 'Grade Calculator'] },
+    { name: 'Overview',   items: ['Dashboard', 'At-Risk Students'] },
+    { name: 'DSA Engine', items: ['Priority Queue', 'Sliding Window', 'Hash Map Lookup', 'Grade Calculator'] },
+    { name: 'System',     items: ['Notifications', 'Analytics', 'ML Model', 'Score New Cohort'] },
   ];
   el.innerHTML = `
     <div class="brand">
       <div class="brand-mark">P</div>
       <div>
-        <div class="brand-name">PAIS</div>
+        <div class="brand-name">PAIS v1.0</div>
         <div class="brand-sub">Academic Intervention</div>
       </div>
     </div>
@@ -61,7 +59,7 @@ function renderSidebar(containerId = 'sidebar') {
     </nav>
     <div class="sidebar-footer">
       <div class="footer-line footer-author">Chirag Batra</div>
-      <div class="footer-line footer-line-muted">PAIS · v1.0</div>
+      <div class="footer-line footer-line-muted">PAIS · v1.0.0</div>
     </div>
   `;
 }

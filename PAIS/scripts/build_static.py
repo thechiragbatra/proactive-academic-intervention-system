@@ -1,13 +1,3 @@
-"""
-PAIS — Static build script for Netlify deployment.
-
-Extracts the trained sklearn pipeline into a JSON model specification that
-runs in the browser, and serialises all cohort + analytics data as static
-JSON files.
-
-Run once, after every retraining or data refresh:
-    python scripts/build_static.py
-"""
 from __future__ import annotations
 import json
 import shutil
@@ -35,9 +25,6 @@ OUT_DATA = OUT / "data"
 OUT_FIG = OUT / "figures"
 
 
-# ----------------------------------------------------------------------------
-# Extract sklearn Pipeline → pure JSON the JS engine can execute
-# ----------------------------------------------------------------------------
 def _extract_model_spec(bundle) -> dict:
     pipe = bundle["model"]
     numeric_cols = bundle["numeric_cols"]
@@ -69,7 +56,6 @@ def _extract_model_spec(bundle) -> dict:
 
 
 def _verify(bundle, sample_df, n=20):
-    """Sanity check: replicating the pipeline manually must match sklearn."""
     pipe = bundle["model"]
     spec = _extract_model_spec(bundle)
     cols = spec["numeric"]["columns"] + spec["categorical"]["columns"]

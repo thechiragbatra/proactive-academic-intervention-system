@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Sliding Window · {{ app_name }}{% endblock %}
+
+{% block content %}
+<header class="algo-page-head">
+  <h1 class="algo-page-title">Sliding Window Algorithm</h1>
+  <div class="algo-page-sub">DSA Module 2 · 7-day attendance variance detection</div>
+</header>
+
+<div class="algo-intro window">
+  <span class="algo-tag window">7-DAY ROLLING WINDOW</span>
+  <div class="algo-name">📅 Sliding Window Attendance Detection</div>
+  <p class="algo-desc">
+    Rather than comparing total semester attendance, PAIS uses a 7-day sliding
+    window to detect sudden "vanishing" patterns. A student maintaining 80%
+    overall can still trigger an early warning if their last 7 days show 0–2
+    attendances — catching the problem weeks before the total percentage
+    drops below 75%.
+  </p>
+  <div class="complexity-row">
+    <div class="complexity-cell">
+      <div class="complexity-label">WINDOW SIZE</div>
+      <div class="complexity-value">7 days</div>
+    </div>
+    <div class="complexity-cell">
+      <div class="complexity-label">SLIDE</div>
+      <div class="complexity-value">O(1)</div>
+    </div>
+    <div class="complexity-cell">
+      <div class="complexity-label">FULL SCAN</div>
+      <div class="complexity-value">O(n)</div>
+    </div>
+    <div class="complexity-cell">
+      <div class="complexity-label">SPACE</div>
+      <div class="complexity-value">O(k)</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="window-stream">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+      <div class="panel-title">📊 Simulated Attendance Stream (30 days)</div>
+      <button class="btn" id="randomizeBtn" type="button">↻ Randomize</button>
+    </div>
+
+    <div class="stream-bars" id="streamBars"></div>
+    <div class="stream-labels" id="streamLabels"></div>
+
+    <div style="font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted); margin-top: 10px;">
+      <span style="color: var(--ink-soft);">Semester attendance:</span>
+      <span id="semPct" style="color: var(--ink); font-weight: 500;">—</span>
+      &nbsp;&nbsp;
+      <span style="color: var(--ink-soft);">Window (D19–D25):</span>
+      <span id="winPct" style="color: var(--risk-critical); font-weight: 500;">—</span>
+    </div>
+
+    <div id="warningBox" style="margin-top: 10px; padding: 10px 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; display: none;">
+      <div style="color: var(--risk-critical); font-weight: 600; font-size: 13px; margin-bottom: 4px;">
+        🚨 EARLY WARNING TRIGGERED — Sudden attendance gap detected
+      </div>
+      <div style="color: var(--ink-soft); font-size: 12px;">
+        Even with <span id="overallTxt">—</span>% overall attendance, the 7-day window reveals
+        a critical pattern that would be missed by total-percentage monitoring.
+      </div>
+    </div>
+
+    <div class="stream-legend">
+      <div><span class="legend-dot" style="background: var(--accent);"></span>Current 7-day window</div>
+      <div><span class="legend-dot" style="background: var(--hue-window);"></span>Present</div>
+      <div><span class="legend-dot" style="background: var(--risk-critical);"></span>Absent in window</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">⚠️ Students with Attendance Gaps</div>
+        <div class="panel-sub">Window variance &gt; threshold</div>
+      </div>
+      <div class="small mono muted">{{ n_anomalies }} flagged</div>
+    </div>
+
+    <div class="flagged-list">
+      {% for s in flagged %}
+      <div class="flagged-item">
+        <div>
+          <div class="flagged-info-name">{{ s.name }}</div>
+          <div class="flagged-info-meta">{{ s.sid }} · Semester: {{ s.semester_pct }}%</div>
+        </div>
+        <div class="flagged-pct">
+          <div class="num {% if s.window_pct < 35 %}bad{% elif s.window_pct < 60 %}warn{% else %}high{% endif %}">
+            Window: {{ s.window_pct }}%
+          </div>
+          <div class="label">{% if s.window_pct < 35 %}🚨 FLAGGED{% else %}Watch{% endif %}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function randomStream() {
+  const days = 30;
+  const arr = [];
+  for (let i = 0; i < days; i++) {
+    if (i >= 18 && i < 25) {
+      arr.push(Math.random() < 0.18 ? 1 : 0);
+    } else {
+      arr.push(Math.random() < 0.85 ? 1 : 0);
+    }
+  }
+  return arr;
+}
+
+function render(arr) {
+  const bars = document.getElementById('streamBars');
+  const labels = document.getElementById('streamLabels');
+  bars.innerHTML = '';
+  labels.innerHTML = '';
+  arr.forEach((v, i) => {
+    const inWindow = (i >= 18 && i < 25);
+    const div = document.createElement('div');
+    div.className = 'stream-bar';
+    if (inWindow && v === 0)      div.classList.add('window-absent');
+    else if (inWindow && v === 1) div.classList.add('window-present');
+    else if (v === 1)             div.classList.add('present');
+    else                          div.classList.add('absent');
+    bars.appendChild(div);
+
+    const lbl = document.createElement('span');
+    lbl.textContent = 'D' + (i + 1);
+    labels.appendChild(lbl);
+  });
+  const total = arr.reduce((a, b) => a + b, 0);
+  const winSum = arr.slice(18, 25).reduce((a, b) => a + b, 0);
+  const overall = Math.round((total / arr.length) * 100);
+  const winPct = Math.round((winSum / 7) * 100);
+  document.getElementById('semPct').textContent = overall + '%';
+  document.getElementById('winPct').textContent = winPct + '%';
+  document.getElementById('overallTxt').textContent = overall;
+  document.getElementById('warningBox').style.display = winPct < 35 ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  let arr = randomStream();
+  render(arr);
+  document.getElementById('randomizeBtn').addEventListener('click', () => {
+    render(randomStream());
+  });
+});
+</script>
+{% endblock %}

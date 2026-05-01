@@ -1,20 +1,3 @@
-"""
-OOP — RiskPredictor service class.
-
-Wraps the trained ML pipeline plus a rule-based composite risk score. The
-synopsis describes this class as "inheriting data to run Random Forest /
-XGBoost", so we expose both an ML-backed and a rule-backed scoring method
-and blend them.
-
-Blending logic
---------------
-    final_risk = 0.7 * ml_probability + 0.3 * rule_based_score
-
-The blend is deliberate: the ML model handles subtle patterns; the rule
-score stays interpretable (mentors can explain "attendance 0.25 weight,
-midterm 0.25 weight..."). When the two disagree by more than 0.3, we log
-a warning on the record so reviewers notice borderline cases.
-"""
 from __future__ import annotations
 import joblib
 import numpy as np
@@ -27,13 +10,6 @@ from .student_record import StudentRecord, StudentCohort
 
 
 class RiskPredictor:
-    """
-    Encapsulates both ML-based and heuristic risk scoring.
-
-    Typical use:
-        rp = RiskPredictor.load()
-        rp.score_cohort(cohort)
-    """
 
     def __init__(self, model=None, feature_names: list[str] | None = None,
                  *, ml_weight: float = 0.7) -> None:
@@ -42,9 +18,7 @@ class RiskPredictor:
         self.ml_weight = ml_weight
         self.rule_weight = 1.0 - ml_weight
 
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
+
     @classmethod
     def load(cls, path: Path | None = None) -> "RiskPredictor":
         path = path or (C.MODELS_DIR / "risk_model.pkl")
@@ -54,16 +28,8 @@ class RiskPredictor:
             feature_names=bundle.get("feature_names", []),
         )
 
-    # ------------------------------------------------------------------
-    # Scoring primitives
-    # ------------------------------------------------------------------
-    def rule_based_score(self, record: StudentRecord) -> float:
-        """
-        Interpretable 0..1 composite.
 
-        Each component is mapped to a "risk contribution" where 0 = healthy,
-        1 = catastrophic, then weighted by `C.RISK_WEIGHTS`.
-        """
+    def rule_based_score(self, record: StudentRecord) -> float:
         w = C.RISK_WEIGHTS
 
         def clamp(x): return max(0.0, min(1.0, x))
@@ -75,7 +41,7 @@ class RiskPredictor:
             "quizzes":       clamp((60 - (record.quizzes_avg or 0)) / 60),
             "participation": clamp((60 - (record.participation or 0)) / 60),
             "projects":      clamp((60 - (record.projects or 0)) / 60),
-            # Engagement: high stress or low sleep bumps risk.
+
             "engagement":    clamp(
                 ((record.stress or 5) - 5) / 10
                 + (7 - (record.sleep or 7)) / 10
@@ -84,17 +50,13 @@ class RiskPredictor:
         return sum(w[k] * comp[k] for k in w)
 
     def ml_probability(self, rows: pd.DataFrame) -> np.ndarray:
-        """Return P(at_risk) from the ML pipeline for a batch."""
         if self.model is None:
             raise RuntimeError("No ML model loaded. Call RiskPredictor.load() first.")
         return self.model.predict_proba(rows)[:, 1]
 
-    # ------------------------------------------------------------------
-    # Public API — scoring a cohort
-    # ------------------------------------------------------------------
+
     def score_cohort(self, cohort: StudentCohort) -> None:
-        """Set `risk_score` and `risk_band` on every record in the cohort."""
-        # Build a DataFrame in the exact feature order the model expects.
+
         rows = pd.DataFrame([r.to_dict() for r in cohort])
         rows = self._prepare_for_model(rows)
 
@@ -107,12 +69,8 @@ class RiskPredictor:
             record.risk_band = self._band_for(blended)
 
     def _prepare_for_model(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Ensure df has exactly the columns the trained pipeline expects.
-        Missing columns are filled with sensible defaults; extras are dropped.
-        """
-        # The pipeline has its own ColumnTransformer, so we only need to
-        # ensure the raw-feature columns exist with their expected names.
+
+
         col_rename = {
             "attendance":        "Attendance (%)",
             "midterm":           "Midterm_Score",
@@ -133,7 +91,7 @@ class RiskPredictor:
         }
         df = df.rename(columns=col_rename)
 
-        # Re-create engineered features inline (same formulas as preprocessing).
+
         df["early_academic_avg"] = (
             0.40 * df["Midterm_Score"]
             + 0.25 * df["Assignments_Avg"]
@@ -152,9 +110,7 @@ class RiskPredictor:
 
         return df[self.feature_names]
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+
     @staticmethod
     def _band_for(score: float) -> str:
         for threshold, label in C.RISK_BANDS:

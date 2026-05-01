@@ -1,9 +1,3 @@
-"""
-Business logic — AlertService orchestrator.
-
-Wires the RiskPredictor + GradeOptimizer + NotificationEngine into a single
-service the dashboard and the CLI can both consume.
-"""
 from __future__ import annotations
 from pathlib import Path
 
@@ -19,7 +13,6 @@ from .. import config as C
 
 
 class AlertService:
-    """Top-level façade — one object, three verbs: score / rank / notify."""
 
     def __init__(self, predictor: RiskPredictor | None = None,
                  engine: NotificationEngine | None = None) -> None:
@@ -47,11 +40,6 @@ class AlertService:
     def notify(self, cohort: StudentCohort, *,
                notify_parents_for: set[str] | None = None,
                marks_reflected_pct: float = 55.0) -> int:
-        """
-        Build recommendations and fire off batch notifications.
-
-        Returns the count of notifications sent (students + parents).
-        """
         recs = {
             r.student_id: build_recommendation_text(r, self.optimizer)
             for r in cohort

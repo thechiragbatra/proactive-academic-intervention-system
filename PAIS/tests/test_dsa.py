@@ -1,8 +1,3 @@
-"""
-Unit tests for DSA modules.
-
-Run:  pytest -q tests/
-"""
 from __future__ import annotations
 import sys
 from pathlib import Path
@@ -19,9 +14,6 @@ from src.dsa.grade_optimizer import GradeOptimizer
 from src.dsa.sorter import rank_by_gradient
 
 
-# ---------------------------------------------------------------------------
-# Priority queue
-# ---------------------------------------------------------------------------
 def test_heap_orders_by_descending_score():
     h = RiskHeap()
     h.push("S1", 0.2); h.push("S2", 0.9); h.push("S3", 0.5)
@@ -32,7 +24,7 @@ def test_heap_orders_by_descending_score():
 def test_heap_update_in_place():
     h = RiskHeap()
     h.push("S1", 0.1); h.push("S2", 0.9)
-    h.push("S1", 0.95)          # update — should now lead
+    h.push("S1", 0.95)
     top = [sid for sid, _, _ in h.peek_top(2)]
     assert top == ["S1", "S2"]
     assert h.get("S1") == 0.95
@@ -46,9 +38,6 @@ def test_heap_pop_drains_in_order():
     assert order == ["B", "C", "A"]
 
 
-# ---------------------------------------------------------------------------
-# Sliding window
-# ---------------------------------------------------------------------------
 def test_sliding_window_flags_gap():
     logs = pd.DataFrame([
         ("S1", d, 1 if d < 15 else 0, 0)
@@ -69,9 +58,6 @@ def test_sliding_window_quiet_student_no_anomaly():
     assert anomalies.empty
 
 
-# ---------------------------------------------------------------------------
-# Hash index
-# ---------------------------------------------------------------------------
 def test_hash_index_o1_lookup():
     df = pd.DataFrame({
         "Student_ID": ["S1", "S2"],
@@ -83,14 +69,11 @@ def test_hash_index_o1_lookup():
     assert idx.get_profile("S3") is None
 
 
-# ---------------------------------------------------------------------------
-# Graph
-# ---------------------------------------------------------------------------
 def test_resource_graph_isolation():
     g = ResourceGraph()
     g.add_edge("S1", "R1", 3)
     g.add_edge("S1", "R2", 2)
-    g.add_edge("S2", "R1", 1)   # S2 only touches R1
+    g.add_edge("S2", "R1", 1)
     isolated = g.isolated_students(min_edges=2)
     assert "S2" in isolated
     assert "S1" not in isolated
@@ -103,13 +86,10 @@ def test_resource_graph_bfs():
     assert reached == {"S1", "S3"}
 
 
-# ---------------------------------------------------------------------------
-# Grade optimizer
-# ---------------------------------------------------------------------------
 def test_optimizer_returns_zero_for_already_passed():
     opt = GradeOptimizer()
     rec = opt.full_roadmap(midterm=95, assignments=95, quizzes=95, projects=95)
-    # Grade O should be feasible (probably already locked in).
+
     o_rec = next(g for g in rec if g.target_grade == "O")
     assert o_rec.feasible
 
@@ -123,9 +103,6 @@ def test_optimizer_infeasible_when_too_far_behind():
     assert not rec.feasible
 
 
-# ---------------------------------------------------------------------------
-# Sorter
-# ---------------------------------------------------------------------------
 def test_gradient_sort_identifies_improver():
     df = pd.DataFrame({
         "Student_ID": ["S1", "S2"],
@@ -133,5 +110,5 @@ def test_gradient_sort_identifies_improver():
         "early_academic_avg": [50, 50],
     })
     ranked = rank_by_gradient(df)
-    assert ranked.iloc[0]["Student_ID"] == "S1"   # improver at top
-    assert ranked.iloc[-1]["Student_ID"] == "S2"   # decliner at bottom
+    assert ranked.iloc[0]["Student_ID"] == "S1"
+    assert ranked.iloc[-1]["Student_ID"] == "S2"

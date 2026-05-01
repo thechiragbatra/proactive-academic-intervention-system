@@ -1,13 +1,3 @@
-"""
-PAIS — Flask web application.
-
-Serves a multi-page analytics dashboard backed by the trained ML model,
-the DSA modules, and the OOP service layer.
-
-Run:
-    python webapp/app.py
-    # then open http://127.0.0.1:5000
-"""
 from __future__ import annotations
 import json
 import sys
@@ -23,7 +13,7 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-# Make `src.*` imports work when running this file directly.
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -44,26 +34,19 @@ from src.dsa.sorter import rank_by_gradient
 from src.business.recommendations import build_recommendation_text
 
 
-# ---------------------------------------------------------------------------
-# App
-# ---------------------------------------------------------------------------
 app = Flask(__name__,
             template_folder=str(ROOT / "webapp" / "templates"),
             static_folder=str(ROOT / "webapp" / "static"))
 app.config["SECRET_KEY"] = "pais-dev-secret-change-in-prod"
 app.config["UPLOAD_FOLDER"] = str(ROOT / "webapp" / "uploads")
-app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024   # 20 MB
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"csv"}
 
 
-# ---------------------------------------------------------------------------
-# Lazy, cached pipeline loader
-# ---------------------------------------------------------------------------
 @lru_cache(maxsize=1)
 def _pipeline_state():
-    """Load the processed dataset, train-time artefacts, and DSA structures once."""
     df = preprocess(persist=False)
 
     logs_path = C.DATA_DAILY_LOGS
@@ -108,7 +91,7 @@ def _pipeline_state():
         "optimizer": GradeOptimizer(),
     }
 
-    # Replay any persisted edits so changes survive restart.
+
     replayed = _replay_edits_on_cohort(state)
     if replayed:
         print(f"  replayed {replayed} persisted edit(s) from edits_overlay.jsonl")
@@ -116,9 +99,6 @@ def _pipeline_state():
     return state
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 def _cohort_stats(cohort: StudentCohort) -> dict:
     bands = {"CRITICAL": 0, "HIGH": 0, "MODERATE": 0, "LOW": 0, "SAFE": 0}
     dept_counts: dict[str, int] = {}
@@ -156,9 +136,6 @@ def _record_to_dict(r: StudentRecord) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# HTML routes
-# ---------------------------------------------------------------------------
 @app.route("/")
 def dashboard():
     state = _pipeline_state()
@@ -282,24 +259,17 @@ def upload():
             out_path = Path(app.config["UPLOAD_FOLDER"]) / f"scored_{fname}"
             new_df.to_csv(out_path, index=False)
 
-            # ----------------------------------------------------------------
-            # Full analysis on the uploaded cohort.
-            # Same shape as the main dashboard so the page feels native.
-            # ----------------------------------------------------------------
 
-            # Band distribution — keep the band order consistent with the main
-            # dashboard so the chart colour ramp lines up.
             band_order = ["SAFE", "LOW", "MODERATE", "HIGH", "CRITICAL"]
             band_counts = {b: int((new_df["risk_band"] == b).sum())
                            for b in band_order}
 
-            # Mean risk per department (Department is already validated above)
+
             dept_avg = (new_df.groupby("Department")["risk_score"]
                         .mean().round(3).to_dict())
             dept_count = (new_df.groupby("Department").size().to_dict())
 
-            # Top-10 at-risk via the actual heap module — same code path the
-            # main dashboard uses, gives the panel feature parity.
+
             heap = RiskHeap()
             for _, row in new_df.iterrows():
                 full_name = (
@@ -311,25 +281,21 @@ def upload():
                            "band": row["risk_band"]})
             top10 = heap.peek_top(10)
 
-            # Sliding-window anomaly detection.
-            # The uploaded CSV has only aggregate attendance %, no daily rows,
-            # so we synthesise a daily log from each student's attendance %
-            # using the same generator the original cohort uses. We're upfront
-            # that this is synthetic (also flagged on the model page).
+
             try:
                 upload_logs = generate_daily_logs(new_df)
                 anomalies_df = detect_attendance_anomalies(upload_logs)
                 anomaly_count = int(len(anomalies_df))
                 worst_windows = anomalies_df.head(5).to_dict(orient="records")
-            except Exception as exc:  # never block the page on this
+            except Exception as exc:
                 print(f"sliding-window failed: {exc}")
                 anomaly_count = 0
                 worst_windows = []
 
-            # Improvers / decliners via the stable-sort module.
+
             try:
                 ranked = rank_by_gradient(new_df)
-                # Pull a name lookup so panel can show "S0042  Sara Khan"
+
                 names = {row["Student_ID"]: (
                     f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
                     or row["Student_ID"])
@@ -387,9 +353,6 @@ def serve_figure(filename: str):
     return send_from_directory(C.FIGURES_DIR, filename)
 
 
-# ---------------------------------------------------------------------------
-# Edit — form, simulate, update, persistence
-# ---------------------------------------------------------------------------
 EDIT_FIELDS_NUMERIC = {
     "attendance":      ("Attendance (%)",         0.0, 100.0, float),
     "midterm":         ("Midterm_Score",          0.0, 100.0, float),
@@ -413,7 +376,7 @@ EDIT_FIELDS_CATEGORICAL = {
     "family_income":          ("Family_Income_Level", ["Low", "Medium", "High"]),
 }
 
-EDITS_OVERLAY_FILE = None  # resolved at runtime via config
+EDITS_OVERLAY_FILE = None
 
 
 def _edits_overlay_path():
@@ -421,11 +384,6 @@ def _edits_overlay_path():
 
 
 def _apply_edits_from_form(record, form) -> dict[str, str]:
-    """
-    Parse form values, validate, and apply them to `record`.
-    Returns a dict of {field: error_msg} for any fields that failed validation.
-    Only writes valid fields; partial updates OK.
-    """
     errors: dict[str, str] = {}
     for attr, (_col, lo, hi, caster) in EDIT_FIELDS_NUMERIC.items():
         raw = form.get(attr, "").strip()
@@ -454,11 +412,10 @@ def _apply_edits_from_form(record, form) -> dict[str, str]:
 
 
 def _rescore_and_update_state(state, record) -> None:
-    """Re-score a single record, update heap and df."""
-    # Re-score
+
     state["predictor"].score_cohort(StudentCohort([record]))
 
-    # Update heap (push handles in-place updates via stale-entry marking)
+
     state["heap"].push(
         record.student_id, record.risk_score or 0,
         metadata={"name": record.full_name,
@@ -466,7 +423,7 @@ def _rescore_and_update_state(state, record) -> None:
                   "department": record.department},
     )
 
-    # Mirror edits into state['df'] so any downstream re-reads stay consistent.
+
     df = state["df"]
     idx = df.index[df["Student_ID"] == record.student_id]
     if len(idx):
@@ -475,7 +432,7 @@ def _rescore_and_update_state(state, record) -> None:
             df.at[i, col] = getattr(record, attr)
         for attr, (col, _choices) in EDIT_FIELDS_CATEGORICAL.items():
             df.at[i, col] = getattr(record, attr)
-        # Recompute engineered columns
+
         df.at[i, "early_academic_avg"] = (
             0.40 * (record.midterm or 0) + 0.25 * (record.assignments_avg or 0)
             + 0.20 * (record.quizzes_avg or 0) + 0.15 * (record.projects or 0))
@@ -489,10 +446,6 @@ def _rescore_and_update_state(state, record) -> None:
 
 
 def _persist_edit_overlay(record) -> None:
-    """
-    Append the edit to a JSONL overlay file. On app startup, overlays
-    are replayed so edits survive restarts without rewriting the raw CSV.
-    """
     path = _edits_overlay_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -508,12 +461,11 @@ def _persist_edit_overlay(record) -> None:
 
 
 def _replay_edits_on_cohort(state) -> int:
-    """Replay persisted edits onto the freshly-loaded cohort. Returns count."""
     path = _edits_overlay_path()
     if not path.exists():
         return 0
     applied = 0
-    # Later edits win — keep only the most recent per student.
+
     latest: dict[str, dict] = {}
     for line in path.read_text().splitlines():
         try:
@@ -570,15 +522,11 @@ def edit_student(student_id: str):
 
 @app.route("/api/student/<student_id>/simulate", methods=["POST"])
 def api_simulate(student_id: str):
-    """
-    What-if scoring. Takes a JSON payload of field overrides and returns the
-    resulting risk score and band WITHOUT mutating or persisting anything.
-    """
     state = _pipeline_state()
     if student_id not in state["cohort"]:
         return jsonify({"error": "not found"}), 404
 
-    # Clone the record's dict, apply overrides, build a throwaway record.
+
     original = state["cohort"][student_id]
     snapshot = {slot.lstrip("_"): getattr(original, slot)
                 for slot in StudentRecord.__slots__}
@@ -586,7 +534,7 @@ def api_simulate(student_id: str):
     overrides = request.get_json(silent=True) or {}
     for k, v in overrides.items():
         if k in snapshot and v not in (None, ""):
-            # Coerce numerics sent as strings
+
             try:
                 if isinstance(snapshot[k], (int, float)) or k in EDIT_FIELDS_NUMERIC:
                     caster = EDIT_FIELDS_NUMERIC.get(k, (None, None, None, float))[3]
@@ -594,9 +542,9 @@ def api_simulate(student_id: str):
                 else:
                     snapshot[k] = v
             except (TypeError, ValueError):
-                pass   # ignore bad values silently — simulate is best-effort
+                pass
 
-    # Re-hydrate into a StudentRecord using the CSV column names it expects.
+
     kwargs = {
         "Student_ID":                 original.student_id,
         "First_Name":                 original.first_name,
@@ -646,24 +594,156 @@ def notifications_page():
     return render_template("notifications.html", items=items[:200])
 
 
-# ---------------------------------------------------------------------------
-# DSA Engine — standalone tools (no model dependency, pure UI / algorithms)
-# ---------------------------------------------------------------------------
-@app.route("/grade-calculator")
+@app.route("/grade-calculator", methods=["GET", "POST"])
 def grade_calculator():
-    """Standalone UPES grade calculator — pure client-side math."""
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file or file.filename == "":
+            flash("No file selected.", "error")
+            return redirect(url_for("grade_calculator"))
+        if "." not in file.filename or file.filename.rsplit(".", 1)[1].lower() not in ALLOWED_EXTENSIONS:
+            flash("Only CSV files are supported.", "error")
+            return redirect(url_for("grade_calculator"))
+
+        try:
+            new_df = pd.read_csv(file.stream)
+            need = {"Student_ID", "Midterm_Score", "Assignments_Avg",
+                    "Quizzes_Avg", "Projects_Score"}
+            missing = need - set(new_df.columns)
+            if missing:
+                flash(f"Uploaded CSV missing columns: {sorted(missing)}", "error")
+                return redirect(url_for("grade_calculator"))
+
+            opt = GradeOptimizer()
+            results = []
+            best_counts = {}
+            for _, row in new_df.iterrows():
+                sid = row["Student_ID"]
+                full_name = (
+                    f"{row.get('First_Name', '')} {row.get('Last_Name', '')}".strip()
+                    or sid
+                )
+                recs = opt.full_roadmap(
+                    midterm=float(row["Midterm_Score"]),
+                    assignments=float(row["Assignments_Avg"]),
+                    quizzes=float(row["Quizzes_Avg"]),
+                    projects=float(row["Projects_Score"]),
+                )
+                earned = recs[0].already_earned_weighted if recs else 0
+                best = opt.best_achievable_grade(
+                    midterm=float(row["Midterm_Score"]),
+                    assignments=float(row["Assignments_Avg"]),
+                    quizzes=float(row["Quizzes_Avg"]),
+                    projects=float(row["Projects_Score"]),
+                ) or "F"
+                by_grade = {r.target_grade: r for r in recs}
+                def _pack(g):
+                    r = by_grade.get(g)
+                    if not r:
+                        return {"feasible": False, "req": 0}
+                    return {"feasible": r.feasible,
+                            "req": r.required_from_remaining}
+                results.append({
+                    "sid": sid, "name": full_name,
+                    "earned": float(earned),
+                    "best": best,
+                    "aplus": _pack("A+"),
+                    "a":     _pack("A"),
+                    "bplus": _pack("B+"),
+                })
+                best_counts[best] = best_counts.get(best, 0) + 1
+
+            order = ["O", "A+", "A", "B+", "B", "C", "P", "F"]
+            best_counts = {g: best_counts[g] for g in order if g in best_counts}
+
+            return render_template(
+                "grade_calculator.html",
+                csv_results=results,
+                best_grade_counts=best_counts,
+            )
+        except Exception as exc:
+            traceback.print_exc()
+            flash(f"CSV processing failed: {exc}", "error")
+            return redirect(url_for("grade_calculator"))
+
     return render_template("grade_calculator.html")
 
 
-@app.route("/dsa-visualizer")
-def dsa_visualizer():
-    """Interactive visualisations of the four DSA algorithms used in PAIS."""
-    return render_template("dsa_visualizer.html")
+@app.route("/dsa/priority-queue")
+def dsa_priority_queue():
+    state = _pipeline_state()
+    raw_top = state["heap"].peek_top(10)
+    cohort = state["cohort"]
+    enriched = []
+    for sid, score, meta in raw_top:
+        rec = cohort[sid] if sid in cohort else None
+        m = dict(meta)
+        if rec is not None:
+            m["attendance"] = rec.attendance
+            m["total_score"] = rec.total_score
+        enriched.append((sid, score, m))
+    top7 = enriched[:7]
+    return render_template(
+        "dsa/priority_queue.html",
+        top10=enriched,
+        top7=top7,
+    )
 
 
-# ---------------------------------------------------------------------------
-# JSON API
-# ---------------------------------------------------------------------------
+@app.route("/dsa/sliding-window")
+def dsa_sliding_window():
+    state = _pipeline_state()
+    anomalies_df = state["anomalies"]
+    n_anomalies = int(len(anomalies_df))
+    cohort = state["cohort"]
+    flagged = []
+    for _, row in anomalies_df.head(10).iterrows():
+        sid = row["Student_ID"]
+        rec = cohort[sid] if sid in cohort else None
+        flagged.append({
+            "sid": sid,
+            "name": rec.full_name if rec else sid,
+            "semester_pct": round(rec.attendance, 1) if rec else 0,
+            "window_pct": round(float(row.get("mean_attended", 0)) * 100),
+            "reason": row.get("reason", ""),
+        })
+    return render_template(
+        "dsa/sliding_window.html",
+        flagged=flagged,
+        n_anomalies=n_anomalies,
+    )
+
+
+@app.route("/dsa/hash-map")
+def dsa_hash_map():
+    state = _pipeline_state()
+    n_keys = len(state["cohort"])
+    return render_template(
+        "dsa/hash_map.html",
+        n_keys=n_keys,
+        n_fields=22,
+    )
+
+
+@app.route("/api/student-lookup/<sid>")
+def api_student_lookup(sid):
+    state = _pipeline_state()
+    if sid not in state["cohort"]:
+        return jsonify({"found": False})
+    r = state["cohort"][sid]
+    return jsonify({
+        "found": True,
+        "sid": r.student_id,
+        "name": r.full_name,
+        "department": r.department,
+        "risk_score": round(r.risk_score or 0, 3),
+        "risk_band": r.risk_band,
+        "attendance": round(r.attendance or 0, 1),
+        "midterm": round(r.midterm or 0, 1),
+        "grade": r.grade,
+    })
+
+
 @app.route("/api/students")
 def api_students():
     state = _pipeline_state()
@@ -762,9 +842,6 @@ def api_gradient():
     return jsonify({"improvers": improvers, "decliners": decliners})
 
 
-# ---------------------------------------------------------------------------
-# Errors + globals
-# ---------------------------------------------------------------------------
 @app.errorhandler(404)
 def not_found(e):
     return render_template("error.html", code=404, message="Page not found"), 404
@@ -791,6 +868,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "127.0.0.1")
     print(f"Ready. Open http://{host}:{port}")
-    # debug=True only locally; Render sets PORT so this branch is safe.
-    app.run(host=host, port=port, debug=(os.environ.get("FLASK_ENV") != "production"))
 
+    app.run(host=host, port=port, debug=(os.environ.get("FLASK_ENV") != "production"))

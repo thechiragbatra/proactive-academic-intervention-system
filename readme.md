@@ -18,6 +18,7 @@ PAIS is a full-stack web application that combines a **hybrid ML risk scorer** w
 By the time end-semester results arrive, the intervention window is already closed. Most institutional dashboards report aggregate attendance percentages and cohort means — they don't rank students by predicted risk, catch sudden 2-week absence gaps, or tell a student what score they need on the final to recover a target grade.
 
 PAIS fills that gap.
+![PAIS Demo](PAIS_Demo.gif)
 
 ---
 

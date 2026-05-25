@@ -217,11 +217,11 @@ pytest tests/test_dsa.py -v
 
 ## 👥 Team
 
-| Name | Roll No. |
+| Name |  
 |---|---|
-| Chirag Batra | 5001193174 |
-| Shikhar Singh | 500131748 |
-| Anjali Mamgain | 500123535|
+| Chirag Batra |  
+| Shikhar Singh |  
+| Anjali Mamgain | 
 
 **Guide:** Dr. Khursheed Ahmad Bhat, Assistant Professor, School of Computer Science, UPES Dehradun
 
